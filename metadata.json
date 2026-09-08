@@ -1,0 +1,6 @@
+{
+  "name": "AfyaLishe - Mfumo wa Lishe na Sukari",
+  "description": "Mfumo jumuishi wa lishe wenye sura mbili (Mtaalam wa Lishe & Wagonjwa wa Kisukari na Uzito), usajili wa wateja, udhibiti wa nenosiri kwa Admin na Mgonjwa, idhini ya ku-print ripoti, na faragha thabiti ya taarifa.",
+  "requestFramePermissions": ["camera"],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
