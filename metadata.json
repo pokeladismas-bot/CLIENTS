@@ -1,6 +1,6 @@
 {
   "name": "AfyaLishe - Mfumo wa Lishe na Sukari",
-  "description": "Mfumo jumuishi wa lishe wenye sura mbili (Mtaalam wa Lishe & Wagonjwa wa Kisukari na Uzito), usajili wa wateja, udhibiti wa nenosiri kwa Admin na Mgonjwa, idhini ya ku-print ripoti, na faragha thabiti ya taarifa.",
+  "description": "Mfumo jumuishi wa lishe na afya: matibabu ya shinikizo la damu (kupanda na kushuka), kisukari, uzito na watoto; sahani ya muongozo wa chakula Tanzania (TFNC); ratiba za kuchapisha kwa wasio na simu; vikumbusho vya ulaji na maji; na mawasiliano ya madaktari walio karibu na walio online.",
   "requestFramePermissions": ["camera"],
   "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
 }

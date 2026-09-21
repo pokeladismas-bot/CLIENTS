@@ -1,0 +1,29 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    
+    // Test document used to verify connection
+    match /test/{docId} {
+      allow read: if true;
+      allow write: if request.auth != null;
+    }
+
+    // User profiles
+    match /users/{userId} {
+      allow read: if request.auth != null;
+      allow write: if request.auth != null && (request.auth.uid == userId || request.auth.token.email == 'dismaspokela@gmail.com');
+    }
+
+    // Patients collection
+    match /patients/{patientId} {
+      allow read: if request.auth != null;
+      allow write: if request.auth != null;
+    }
+
+    // Clinic logs and dietary records
+    match /logs/{logId} {
+      allow read: if request.auth != null;
+      allow write: if request.auth != null;
+    }
+  }
+}

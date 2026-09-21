@@ -158,7 +158,7 @@ export const PatientRegistrationModal: React.FC<PatientRegistrationModalProps> =
               >
                 <div className="flex items-center gap-2 mb-1">
                   <HeartPulse className={`w-4 h-4 ${category === 'kisukari' ? 'text-rose-600' : 'text-slate-500'}`} />
-                  <span className="text-sm font-extrabold">Mgonjwa wa Kisukari</span>
+                  <span className="text-sm font-extrabold">Udhibiti wa Sukari (Kisukari)</span>
                 </div>
                 <p className="text-[11px] text-slate-500 leading-tight">
                   Ufuatiliaji wa sukari, wanga, na mlo salama wa kisukari

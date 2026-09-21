@@ -1,0 +1,58 @@
+{
+  "entities": {
+    "users": {
+      "description": "User profiles for authenticated system users (patients, doctors, admins)",
+      "fields": {
+        "uid": {
+          "type": "string",
+          "description": "Unique Firebase Auth User ID"
+        },
+        "email": {
+          "type": "string",
+          "description": "Email address of the user"
+        },
+        "displayName": {
+          "type": "string",
+          "description": "User's display or full name"
+        },
+        "photoURL": {
+          "type": "string",
+          "description": "Avatar photo URL"
+        },
+        "role": {
+          "type": "string",
+          "description": "Role in the system (patient, practitioner, admin)"
+        },
+        "lastLoginAt": {
+          "type": "timestamp",
+          "description": "Timestamp of the last successful login"
+        }
+      }
+    },
+    "patients": {
+      "description": "Registered clinic patients records with medical conditions and diet logs",
+      "fields": {
+        "id": {
+          "type": "string",
+          "description": "Unique patient identifier"
+        },
+        "fullName": {
+          "type": "string",
+          "description": "Full name of the registered patient"
+        },
+        "phone": {
+          "type": "string",
+          "description": "Contact telephone number"
+        },
+        "username": {
+          "type": "string",
+          "description": "Login username"
+        },
+        "category": {
+          "type": "string",
+          "description": "Health condition category (kisukari, shinikizo_la_damu, kupunguza_uzito, etc.)"
+        }
+      }
+    }
+  }
+}

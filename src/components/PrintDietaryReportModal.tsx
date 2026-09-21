@@ -3,10 +3,12 @@ import {
   Printer, FileDown, Image, X, Check, HeartPulse, ShieldCheck, 
   Utensils, Droplets, AlertTriangle, Sparkles, Clock, Calendar, 
   User, CheckCircle2, ChevronRight, Apple, Info, Download, Loader2,
-  Lock, KeyRound, ShieldAlert, ToggleLeft, ToggleRight
+  Lock, KeyRound, ShieldAlert, ToggleLeft, ToggleRight,
+  HardDrive, UploadCloud
 } from 'lucide-react';
-import { DietaryRecommendationItem, GlucoseLog, GlucoseRecommendationResponse, UserProfile } from '../types';
+import { DietaryRecommendationItem, GlucoseLog, GlucoseRecommendationResponse, SecuritySettings, UserProfile } from '../types';
 import { directPrintReport, downloadElementAsImage, downloadElementAsPdf } from '../utils/reportExport';
+import { getCachedDriveToken, signInWithGoogleDrive, uploadReportToGoogleDrive } from '../services/googleDriveService';
 
 interface PrintDietaryReportModalProps {
   isOpen: boolean;
@@ -20,6 +22,7 @@ interface PrintDietaryReportModalProps {
   isPrintingAllowedByAdmin?: boolean;
   adminPassword?: string;
   onAdminTogglePrinting?: (allowed: boolean) => void;
+  securitySettings?: SecuritySettings;
 }
 
 export const PrintDietaryReportModal: React.FC<PrintDietaryReportModalProps> = ({
@@ -34,10 +37,12 @@ export const PrintDietaryReportModal: React.FC<PrintDietaryReportModalProps> = (
   isPrintingAllowedByAdmin = false,
   adminPassword = 'admin123',
   onAdminTogglePrinting,
+  securitySettings,
 }) => {
   const reportRef = useRef<HTMLDivElement>(null);
   const [isExportingPdf, setIsExportingPdf] = useState<boolean>(false);
   const [isExportingImage, setIsExportingImage] = useState<boolean>(false);
+  const [isExportingDrive, setIsExportingDrive] = useState<boolean>(false);
   const [exportMessage, setExportMessage] = useState<string | null>(null);
 
   // Security Unlock State for when printing is locked
@@ -161,6 +166,55 @@ export const PrintDietaryReportModal: React.FC<PrintDietaryReportModalProps> = (
     }
   };
 
+  const handleSaveToGoogleDrive = async () => {
+    setIsExportingDrive(true);
+    setExportMessage(null);
+    try {
+      if (!getCachedDriveToken()) {
+        await signInWithGoogleDrive();
+      }
+
+      const cleanPatient = (profile.name || '').replace(/Mgonjwa wa Kisukari\s*\(?/gi, '').replace(/\)/g, '').trim() || 'Mteja';
+      const dateStr = now.toISOString().split('T')[0];
+      const fileName = `AfyaLishe_Ripoti_ya_Lishe_${cleanPatient.replace(/\s+/g, '_')}_${testedGlucose}mg_${dateStr}.json`;
+
+      const payload = {
+        kichwa: 'AfyaLishe - Ripoti Maalum ya Lishe na Sukari',
+        tarehe: now.toLocaleString('sw-TZ'),
+        mteja: {
+          jina: cleanPatient,
+          aina_ya_kisukari: profile.diabetesType,
+          uzito_kg: profile.weightKg,
+          urefu_cm: profile.heightCm,
+          lenggo_la_wanga_gram: profile.targetDailyCarbs,
+        },
+        kipimo_cha_sukari: {
+          kiwango: testedGlucose,
+          kipimo: profile.unit,
+          muda: testedTiming,
+          hali: latestGlucoseLog?.status || 'kawaida',
+        },
+        ushauri_wa_lishe: recommendation?.title || 'Mwongozo wa Mlo na Udhibiti wa Sukari',
+        milo_inayoshauriwa: recommendation?.recommendedMeals || [],
+        vyakula_vya_kuepuka: recommendation?.foodsToAvoid || [],
+      };
+
+      const uploaded = await uploadReportToGoogleDrive(
+        fileName,
+        JSON.stringify(payload, null, 2),
+        'application/json',
+        `Ripoti ya Lishe kwa ${cleanPatient} ya ${testedGlucose} mg/dL`
+      );
+
+      setExportMessage(`Ripoti "${uploaded.name}" imehifadhiwa salama kwenye Google Drive yako!`);
+      setTimeout(() => setExportMessage(null), 6000);
+    } catch (err: any) {
+      setExportMessage(err.message || 'Hitilafu ya kuhifadhi kwenye Google Drive');
+    } finally {
+      setIsExportingDrive(false);
+    }
+  };
+
   return (
     <div className="fixed inset-0 z-50 bg-slate-900/80 backdrop-blur-sm flex items-center justify-center p-2 sm:p-4 overflow-y-auto">
       <div className="bg-slate-100 rounded-3xl shadow-2xl max-w-4xl w-full max-h-[96vh] flex flex-col border border-slate-300 overflow-hidden animate-in fade-in zoom-in-95 duration-200">
@@ -256,6 +310,28 @@ export const PrintDietaryReportModal: React.FC<PrintDietaryReportModalProps> = (
               <span>{isExportingImage ? 'Inatengeneza Picha...' : 'Pakua Picha'}</span>
             </button>
 
+            {/* Google Drive Upload */}
+            <button
+              onClick={canPrint ? handleSaveToGoogleDrive : undefined}
+              disabled={!canPrint || isExportingDrive}
+              id="btn-save-drive-report"
+              className={`px-3.5 py-1.5 rounded-xl text-xs font-bold shadow-sm transition-all flex items-center gap-1.5 ${
+                canPrint
+                  ? 'bg-sky-600 hover:bg-sky-500 active:scale-95 text-white cursor-pointer'
+                  : 'bg-slate-700 text-slate-400 cursor-not-allowed opacity-60'
+              }`}
+              title="Hifadhi nakala kwenye Google Drive yako"
+            >
+              {isExportingDrive ? (
+                <Loader2 className="w-4 h-4 animate-spin" />
+              ) : !canPrint ? (
+                <Lock className="w-3.5 h-3.5 text-amber-400" />
+              ) : (
+                <HardDrive className="w-4 h-4" />
+              )}
+              <span>{isExportingDrive ? 'Inahifadhi Drive...' : 'Google Drive'}</span>
+            </button>
+
             {/* Close */}
             <button
               onClick={onClose}
@@ -339,7 +415,19 @@ export const PrintDietaryReportModal: React.FC<PrintDietaryReportModalProps> = (
             >
               
               {/* Document Header */}
-              <div className="border-b-2 border-teal-800/20 pb-5 space-y-3">
+              <div className="border-b-2 border-teal-800/20 pb-5 space-y-3 relative">
+                {/* Security Watermark Stamp if enabled */}
+                {(securitySettings?.watermarkMedicalReports ?? true) && (
+                  <div className="absolute right-0 top-12 pointer-events-none opacity-15 rotate-[-12deg] select-none border-4 border-teal-800 rounded-2xl p-3 text-center">
+                    <span className="text-xl font-black tracking-widest text-teal-900 uppercase block font-mono">
+                      OFFICIAL MEDICAL RECORD
+                    </span>
+                    <span className="text-[10px] font-bold text-teal-800 uppercase block">
+                      VERIFIED • AFYALISHE CLINICAL CARE
+                    </span>
+                  </div>
+                )}
+
                 <div className="flex items-start justify-between gap-4">
                   <div className="flex items-center gap-3">
                     <div className="w-12 h-12 rounded-2xl bg-teal-700 text-white flex items-center justify-center font-black text-xl shadow-xs">
@@ -347,11 +435,16 @@ export const PrintDietaryReportModal: React.FC<PrintDietaryReportModalProps> = (
                     </div>
                     <div>
                       <h1 className="text-xl sm:text-2xl font-black text-teal-950 tracking-tight">
-                        AfyaLishe Tanzania
+                        {securitySettings?.hospitalFacilityName || 'AfyaLishe Tanzania'}
                       </h1>
-                      <p className="text-xs font-bold text-teal-700 uppercase tracking-wider">
-                        Mwongozo wa Kilishe wa Mgonjwa wa Kisukari (Clinical Nutrition Guide)
+                      <p className="text-xs font-bold text-teal-700 uppercase tracking-wider flex items-center gap-2">
+                        <span>Mwongozo wa Kilishe na Udhibiti wa Sukari (Clinical Nutrition Guide)</span>
                       </p>
+                      {securitySettings?.registrationCouncilLicense && (
+                        <p className="text-[10px] font-mono text-slate-500 mt-0.5">
+                          Leseni ya Baraza: <strong className="text-slate-700">{securitySettings.registrationCouncilLicense}</strong>
+                        </p>
+                      )}
                     </div>
                   </div>
 
@@ -359,6 +452,12 @@ export const PrintDietaryReportModal: React.FC<PrintDietaryReportModalProps> = (
                     <div><strong>Ripoti Na:</strong> {reportId}</div>
                     <div><strong>Tarehe:</strong> {dateFormatted}</div>
                     <div><strong>Saa:</strong> {timeFormatted}</div>
+                    {securitySettings?.clinicalEncryptionBadge && (
+                      <div className="text-[10px] text-emerald-700 font-bold flex items-center justify-end gap-1 pt-0.5">
+                        <ShieldCheck className="w-3 h-3 text-emerald-600" />
+                        <span>Data Imehakikiwa & Kulindwa</span>
+                      </div>
+                    )}
                   </div>
                 </div>
 

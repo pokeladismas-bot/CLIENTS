@@ -129,10 +129,11 @@ export const GlucoseReminderCard: React.FC<GlucoseReminderCardProps> = ({
     if (currentConfig.soundEnabled) {
       playReminderChime();
     }
+    const cleanName = (profile.name || '').replace(/Mgonjwa wa Kisukari\s*\(?/gi, '').replace(/\)/g, '').trim() || 'Mpendwa';
     if (currentConfig.browserNotifications) {
       sendBrowserNotification(
         '🔔 Jaribio la Kikumbusho cha Sukari',
-        'Habari ' + profile.name + ', huu ni mfano wa kikumbusho chako cha kupima sukari ya damu.',
+        'Habari ' + cleanName + ', huu ni mfano wa kikumbusho chako cha kupima sukari ya damu.',
         onOpenGlucoseModal
       );
     }

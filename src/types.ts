@@ -88,13 +88,15 @@ export interface GlucoseLog {
 
 export type PortalMode = 'nutritionist' | 'patient';
 
-export type UserRole = 'admin' | 'patient';
+export type UserRole = 'admin' | 'practitioner' | 'patient';
 
 export interface AuthSession {
   role: UserRole;
   patientId?: string; // Set when role === 'patient'
+  practitionerId?: string; // Set when role === 'practitioner'
   username: string;
   name: string;
+  email?: string;
   phone?: string;
   loginTime: string;
   canPrintReports?: boolean;
@@ -102,9 +104,24 @@ export interface AuthSession {
 
 export interface SecuritySettings {
   adminPassword: string; // Default: 'admin123'
+  adminName: string; // 'DISMAS POKELA'
+  adminEmail: string; // 'dismaspokela@gmail.com'
   allowPatientPrinting: boolean; // Controlled by Admin: whether patients can print/download reports
   requireAdminApprovalForExport: boolean;
   requireLoginFirst: boolean; // Require password/login gate before using the app
+
+  // Mfumo wa Kitaalamu & Ulinzi Zaidi (Professional & Advanced Security Controls)
+  twoFactorAuthEnabled?: boolean; // Uthibitishaji wa Hatua Mbili (PIN ya pili kwa Admin)
+  twoFactorPin?: string; // e.g. '8822'
+  sessionTimeoutMinutes?: number; // Dakika za kujifunga kiotomatiki (e.g. 15, 30, 60 au 0 kwa kutositisha)
+  auditLoggingEnabled?: boolean; // Rekodi za ukaguzi wa kimatibabu (Clinical Audit Logs)
+  watermarkMedicalReports?: boolean; // Weka watermark ya usalama kwenye ripoti za matibabu
+  strictDoctorVerification?: boolean; // Zuia daktari kuingia bila nambari rasmi ya MCT/Baraza la Tiba
+  ipRestrictionEnabled?: boolean; // Zuia mabadiliko ya mfumo kwa vifaa visivyoidhinishwa
+  allowOfflineSyncMode?: boolean; // Ruhusu uhifadhi salama wa ndani bila intaneti
+  clinicalEncryptionBadge?: boolean; // Onyesha alama ya ulinzi wa HIPAA / viwango vya afya
+  hospitalFacilityName?: string; // Jina rasmi la kliniki/hospitali kwenye ripoti
+  registrationCouncilLicense?: string; // Nambari ya Leseni ya Wizara ya Afya / MCT
 }
 
 export interface WaterLogEntry {
@@ -114,7 +131,126 @@ export interface WaterLogEntry {
   amountMl: number;
 }
 
-export type ClientCategory = 'kisukari' | 'kupunguza_uzito' | 'lishe_jumla';
+export type ClientCategory = 'kisukari' | 'kupunguza_uzito' | 'lishe_jumla' | 'watoto_lishe' | 'shinikizo_la_damu';
+
+export type BloodPressureStatus = 
+  | 'chini' // Hypotension: Systolic < 90 au Diastolic < 60
+  | 'kawaida' // Normal: Systolic < 120 NA Diastolic < 80
+  | 'iliyoinuka' // Elevated: Systolic 120-129 NA Diastolic < 80
+  | 'hatua_1' // Stage 1 Hypertension: Systolic 130-139 AU Diastolic 80-89
+  | 'hatua_2' // Stage 2 Hypertension: Systolic >= 140 AU Diastolic >= 90
+  | 'dharura'; // Hypertensive Crisis: Systolic > 180 NA/AU Diastolic > 120
+
+export interface BloodPressureLog {
+  id: string;
+  timestamp: string; // ISO string
+  systolic: number; // mmHg (e.g. 120)
+  diastolic: number; // mmHg (e.g. 80)
+  pulse?: number; // bpm (e.g. 72)
+  status: BloodPressureStatus;
+  notes?: string;
+  arm?: 'kushoto' | 'kulia';
+  position?: 'kukaa' | 'kusimama' | 'kulala';
+}
+
+export type ReferralPriority = 'kawaida' | 'ya_haraka' | 'dharura';
+export type ReferralStatus = 'inasubiri' | 'inaendelea' | 'imethibitishwa' | 'imekamilika';
+
+export interface PatientReferral {
+  id: string;
+  patientId: string;
+  date: string;
+  referralNumber: string; // e.g., 'RUFAA-2026-001'
+  referringDoctor: string; // e.g., 'Dkt. Grace Kimaro (Mtaalam wa Lishe)'
+  referringFacility: string; // e.g., 'Kliniki ya AfyaLishe'
+  targetFacility: string; // e.g., 'Hospitali ya Taifa Muhimbili'
+  targetDepartment: string; // e.g., 'Idara ya Kisukari na Tezi' au 'Idara ya Watoto & Lishe'
+  specialistName?: string;
+  priority: ReferralPriority;
+  status: ReferralStatus;
+  primaryDiagnosis: string;
+  reasonForReferral: string;
+  clinicalSummary: string;
+  latestVitals?: {
+    glucoseMgDl?: number;
+    bloodPressure?: string;
+    weightKg?: number;
+    heightCm?: number;
+    bmi?: number;
+    muacCm?: number;
+  };
+  currentMedications?: string;
+  currentDietaryPlan?: string;
+  specificInvestigationRequested?: string;
+  notesToSpecialist?: string;
+}
+
+export type ChildFeedingChallenge = 
+  | 'picky_eating' // Kuchagua sana vyakula / Ugumu wa kula
+  | 'stunting_growth' // Kudumaa au uzito duni (Failure to thrive)
+  | 'type1_diabetes' // Kisukari cha Utotoni (Aina ya 1)
+  | 'allergies' // Mizio ya vyakula (Maziwa ya ng'ombe, mayai, karanga, gluteni)
+  | 'anemia_deficiency' // Upungufu wa damu au virutubisho (Madini Chuma, Vitamini A)
+  | 'sweet_tooth_junk' // Kupenda vyakula vya sukari na pipi/biskuti
+  | 'junk_food_dependency' // Kutegemea peremende na vitafunwa vya kiwandani
+  | 'poor_appetite' // Kukosa hamu ya kula
+  | 'swallowing_chewing' // Changamoto za kumeza au kutafuna
+  | 'chewing_swallowing'; // Alias ya kumeza au kutafuna
+
+export interface ChildFeedingLog {
+  id: string;
+  date: string;
+  mealType: 'kifungua_kinywa' | 'mchana' | 'usiku' | 'vitafunwa' | 'maziwa';
+  foodItems: string;
+  portionConsumed: 'yote' | 'nusu' | 'kidogo' | 'alikataa';
+  waterAndFluidsMl?: number;
+  reactionOrAllergy?: string;
+  moodDuringMeal?: 'mchangamfu' | 'alilazimishwa' | 'alilia' | 'taratibu';
+  notes?: string;
+}
+
+export interface ChildNutritionProfile {
+  guardianName: string;
+  guardianPhone: string;
+  guardianRelation: string; // Mama, Baba, Mlezi
+  birthDate?: string;
+  ageMonths?: number;
+  breastfeedingStatus: 'anaendelea' | 'ameachishwa' | 'haihusiki';
+  weaningAgeMonths?: number;
+  birthWeightKg?: number;
+  muacCm?: number; // Mid-Upper Arm Circumference (Mzingo wa mkono)
+  muacStatus?: 'kijani' | 'njano' | 'nyekundu'; // Kijani >12.5cm, Njano 11.5-12.5cm, Nyekundu <11.5cm
+  growthPercentileNotes?: string;
+  feedingChallenges: ChildFeedingChallenge[];
+  knownAllergies: string[];
+  favoriteFoods: string[];
+  dislikedFoods: string[];
+  feedingLogs: ChildFeedingLog[];
+  specialPediatricDietPlan?: string;
+}
+
+export interface PatientAIAnalysisResult {
+  patientName: string;
+  analyzedDate: string;
+  overallHealthTrend: 'inaboreka' | 'thabiti' | 'inazidi_kushuka' | 'inahitaji_uangalizi_wa_haraka';
+  executiveSummary: string;
+  glucoseTrendAnalysis: {
+    averageGlucose: number;
+    fastingTrend: string;
+    postMealTrend: string;
+    spikesOrDropsPattern: string;
+    glycemicVariability: string;
+  };
+  criticalAlerts: string[]; // Urgent clinical warnings (e.g. Dawn Phenomenon, night hypos, severe swings)
+  clinicalDietaryRecommendations: string[];
+  suggestedActionItemsForNutritionist: string[];
+  pediatricInsights?: string; // If child patient
+  referralRecommendation?: {
+    isRecommended: boolean;
+    recommendedDepartment?: string;
+    clinicalJustification?: string;
+  };
+}
 
 export interface NutritionistPrescription {
   id: string;
@@ -146,6 +282,8 @@ export interface WeightLogEntry {
   notes?: string;
 }
 
+export type WeightLog = WeightLogEntry;
+
 export interface RegisteredPatient {
   id: string;
   fullName: string;
@@ -158,6 +296,7 @@ export interface RegisteredPatient {
   
   // Login credentials for patient privacy
   username?: string;
+  email?: string; // Registered email for account recovery and notifications
   password?: string; // Login password or PIN for patient portal
   canPrintReports?: boolean; // Patient-level print permission granted by admin
   
@@ -186,6 +325,33 @@ export interface RegisteredPatient {
 
   // Weight logs for weight loss tracking
   weightLogs: WeightLogEntry[];
+
+  // Medical & Clinical Referrals (Rufaa za Mgonjwa)
+  referrals?: PatientReferral[];
+
+  // Pediatric & Child Nutrition Tracking (Watoto & Changamoto za Kilishe)
+  childProfile?: ChildNutritionProfile;
+
+  // Blood Pressure Logs (Vipimo vya Shinikizo la Damu)
+  bloodPressureLogs?: BloodPressureLog[];
+}
+
+export interface MealReminderItem {
+  id: string;
+  name: string; // e.g. "Kifungua Kinywa", "Mchana", "Usiku", "Vitafunwa"
+  time: string; // "07:30"
+  enabled: boolean;
+  notes: string;
+  completedToday?: boolean;
+}
+
+export interface HydrationReminderConfig {
+  enabled: boolean;
+  dailyTargetGlasses: number; // e.g. 8 - 12
+  intervalMinutes: number; // e.g. 60, 90, 120
+  startTime: string; // "07:00"
+  endTime: string; // "21:00"
+  soundEnabled: boolean;
 }
 
 export interface UserProfile {
@@ -214,6 +380,7 @@ export interface UserProfile {
   registeredPatientId?: string;
   isAdmin?: boolean;
   dailyReminders?: DailyReminderConfig;
+  bloodPressureLogs?: BloodPressureLog[];
 }
 
 export interface DailyReminderConfig {
@@ -226,6 +393,123 @@ export interface DailyReminderConfig {
   eveningEnabled: boolean;
   browserNotifications: boolean;
   soundEnabled: boolean;
+  
+  // Extended Meal Reminders
+  mealsEnabled?: boolean;
+  mealSlots?: MealReminderItem[];
+
+  // Extended Water & Hydration Reminders
+  hydration?: HydrationReminderConfig;
+}
+
+// Online & Nearby Clinicians (Mawasiliano na Daktari Aliye Karibu na Aliye Online)
+export interface OnlineDoctor {
+  id: string;
+  name: string;
+  title: string;
+  roleType?: 'doctor' | 'nutritionist'; // 'doctor' = Daktari, 'nutritionist' = Mtaalamu wa Lishe
+  qualifications?: string; // Sifa alizosomea (e.g. MD, MMed, MSc Clinical Nutrition, BSc Dietetics)
+  educationInstitution?: string; // Chuo alichosomea (e.g. MUHAS, KCMUCo, SUA)
+  experienceYears?: number; // Miaka ya uzoefu wa kazi
+  specialty: 'shinikizo_la_damu' | 'kisukari' | 'lishe_ya_kliniki' | 'watoto' | 'afya_ya_jamii';
+  specialtyLabelSwahili: string;
+  facility: string;
+  location: string; // e.g. "Kinondoni, Dar es Salaam"
+  city: string; // e.g. "Dar es Salaam"
+  district?: string; // e.g. "Ilala"
+  isOnline: boolean;
+  rating: number; // e.g. 4.9
+  reviewsCount: number;
+  phone: string;
+  whatsappNumber?: string; // Nambari ya WhatsApp kwa mawasiliano ya haraka
+  registrationCouncilNo?: string; // Nambari ya usajili wa bodi (e.g. Baraza la Madaktari Tanganyika - MCT)
+  avatarUrl?: string;
+  languages: string[];
+  bio: string;
+  distanceKm?: number;
+  consultationFeeTzs: number; // Set strictly by Admin DISMAS POKELA
+  freeFollowup: boolean;
+  isAcceptingEmergencies: boolean;
+  // User account credentials & email dispatch:
+  email?: string; // Registered email to receive initial credentials
+  username?: string; // Username for logging in as practitioner
+  password?: string; // Current password
+  initialPassword?: string; // Initial password assigned by Admin
+  isPasswordChanged?: boolean; // Whether practitioner has updated their password
+  emailSentAt?: string; // Timestamp when initial credentials were sent to email
+  paymentDetails?: {
+    lipaNamba?: string; // e.g. M-Pesa / Tigo Pesa Lipa Namba
+    merchantName?: string;
+    paymentInstructions?: string;
+    accountNumber?: string;
+    bankName?: string;
+  };
+}
+
+export interface DoctorConsultationMessage {
+  id: string;
+  sender: 'patient' | 'doctor';
+  senderName: string;
+  text: string;
+  timestamp: string;
+  isRead?: boolean;
+}
+
+// Tanzanian Food Guide Plate (TFNC Food Plate Guide)
+export interface FoodPlateGroup {
+  id: string;
+  name: string;
+  swahiliTitle: string;
+  recommendedPortionPercentage: string; // e.g. "30-33%"
+  plateVisualColor: string;
+  iconName: string;
+  description: string;
+  keyNutrients: string[];
+  localFoodExamples: {
+    name: string;
+    description: string;
+    portionAdvice: string;
+  }[];
+  healthAdvice: {
+    forHypertension: string;
+    forDiabetes: string;
+    forWeightLoss: string;
+    forChildren: string;
+  };
+}
+
+// Printable & Downloadable Eating Plan for Patients without phones
+export interface PrintableMealDayPlan {
+  dayName: string; // e.g. "Jumatatu", "Jumanne"
+  dayNumber: number;
+  breakfast: string;
+  midMorningSnack: string;
+  lunch: string;
+  afternoonSnack: string;
+  dinner: string;
+  bedtime: string;
+}
+
+export interface PrintableMealPlan {
+  id: string;
+  patientName: string;
+  patientAge?: number;
+  patientPhone?: string;
+  patientLocation?: string;
+  category: ClientCategory;
+  conditionLabel: string;
+  startDate: string;
+  endDate: string;
+  durationLabel: string; // e.g. "Mpango wa Wiki 1 (Siku 7)"
+  nutritionistName: string;
+  nutritionistPhone: string;
+  facilityName: string;
+  dailyWaterTargetGlasses: number;
+  saltRestrictionAdvice: string;
+  keyInstructions: string[];
+  foodsToStrictlyAvoid: string[];
+  foodsToEmphasize: string[];
+  days: PrintableMealDayPlan[];
 }
 
 export type AnnouncementCategory = 
@@ -333,4 +617,6 @@ export interface FoodGuideItem {
   swahiliName: string;
   tips: string;
 }
+
+export type DashboardTheme = 'emerald' | 'ocean' | 'midnight' | 'amber' | 'violet' | 'teal';
 

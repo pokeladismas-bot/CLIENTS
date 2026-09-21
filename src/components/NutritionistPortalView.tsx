@@ -3,32 +3,61 @@ import {
   Users, UserPlus, HeartPulse, Scale, Activity, Search, Filter, 
   Calendar, FileText, Printer, CheckCircle2, ChevronRight, PlusCircle, 
   Sparkles, AlertCircle, ArrowUpRight, Clock, MapPin, Phone, ShieldAlert,
-  Edit3, Trash2, Lock, KeyRound, ShieldCheck, Eye, EyeOff, Shield, Check
+  Edit3, Trash2, Lock, KeyRound, ShieldCheck, Eye, EyeOff, Shield, Check,
+  Baby, Send, Database, Download, Smartphone
 } from 'lucide-react';
-import { ClientCategory, RegisteredPatient, NutritionistPrescription, SecuritySettings } from '../types';
+import { 
+  ClientCategory, RegisteredPatient, NutritionistPrescription, 
+  SecuritySettings, GlucoseLog, MealLog 
+} from '../types';
+import { EditPatientModal } from './EditPatientModal';
+import { PatientReferralModal } from './PatientReferralModal';
+import { PatientAIAnalysisModal } from './PatientAIAnalysisModal';
+import { ChildNutritionTrackerView } from './ChildNutritionTrackerView';
 
 interface NutritionistPortalViewProps {
   patients: RegisteredPatient[];
   onOpenRegisterModal: (category?: ClientCategory) => void;
   onUpdatePatient: (updated: RegisteredPatient) => void;
+  onDeletePatient?: (patientId: string) => void;
   onSelectActivePatientForView: (patient: RegisteredPatient) => void;
   onOpenPrintReport: (glucoseValue?: number) => void;
   securitySettings?: SecuritySettings;
   onUpdateSecuritySettings?: (settings: SecuritySettings) => void;
+  glucoseLogs?: GlucoseLog[];
+  mealLogs?: MealLog[];
+  onOpenAdminPractitionersModal?: () => void;
+  onOpenAdminBackupModal?: () => void;
+  onOpenInstallerModal?: () => void;
+  onOpenSecuritySettings?: () => void;
 }
 
 export const NutritionistPortalView: React.FC<NutritionistPortalViewProps> = ({
   patients,
   onOpenRegisterModal,
   onUpdatePatient,
+  onDeletePatient,
   onSelectActivePatientForView,
   onOpenPrintReport,
   securitySettings,
   onUpdateSecuritySettings,
+  glucoseLogs = [],
+  mealLogs = [],
+  onOpenAdminPractitionersModal,
+  onOpenAdminBackupModal,
+  onOpenInstallerModal,
+  onOpenSecuritySettings,
 }) => {
   const [selectedPatientId, setSelectedPatientId] = useState<string>(patients[0]?.id || '');
   const [filterCategory, setFilterCategory] = useState<string>('all');
   const [searchQuery, setSearchQuery] = useState('');
+
+  // Modals state
+  const [isEditingPatientModalOpen, setIsEditingPatientModalOpen] = useState(false);
+  const [isDeleteConfirmOpen, setIsDeleteConfirmOpen] = useState(false);
+  const [isAIAnalysisModalOpen, setIsAIAnalysisModalOpen] = useState(false);
+  const [isReferralModalOpen, setIsReferralModalOpen] = useState(false);
+  const [patientSubTab, setPatientSubTab] = useState<'prescriptions' | 'pediatric' | 'referrals'>('prescriptions');
   
   // State for adding new prescription
   const [isAddingPrescription, setIsAddingPrescription] = useState(false);
@@ -77,6 +106,8 @@ export const NutritionistPortalView: React.FC<NutritionistPortalViewProps> = ({
   const totalCount = patients.length;
   const diabetesCount = patients.filter(p => p.category === 'kisukari').length;
   const weightLossCount = patients.filter(p => p.category === 'kupunguza_uzito').length;
+  const childrenCount = patients.filter(p => p.category === 'watoto_lishe' || p.age < 18).length;
+  const bpCount = patients.filter(p => p.category === 'shinikizo_la_damu').length;
   const generalCount = patients.filter(p => p.category === 'lishe_jumla').length;
 
   const calculateBmi = (weightKg: number, heightCm: number) => {
@@ -182,6 +213,51 @@ export const NutritionistPortalView: React.FC<NutritionistPortalViewProps> = ({
         </div>
 
         <div className="flex flex-wrap items-center gap-3 w-full md:w-auto">
+          {onOpenInstallerModal && (
+            <button
+              onClick={onOpenInstallerModal}
+              className="flex-1 md:flex-initial px-4 py-3 rounded-2xl bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white font-black text-sm shadow-md border border-emerald-400/40 transition-all flex items-center justify-center gap-2 cursor-pointer"
+              title="Sakinisha Mfumo kwenye Kifaa hiki (Kompyuta au Simu ya Kliniki)"
+            >
+              <Download className="w-4 h-4 text-amber-300 animate-pulse" />
+              <span>📲 Sakinisha App</span>
+            </button>
+          )}
+
+          {onOpenSecuritySettings && (
+            <button
+              type="button"
+              onClick={onOpenSecuritySettings}
+              className="flex-1 md:flex-initial px-4 py-3 rounded-2xl bg-teal-800 hover:bg-teal-700 text-teal-100 font-extrabold text-sm shadow-md border border-teal-500/40 transition-all flex items-center justify-center gap-2 cursor-pointer"
+              title="Fungua Mipangilio ya Kitaalamu, Viwango vya Kliniki na Ulinzi wa Taarifa"
+            >
+              <ShieldCheck className="w-4 h-4 text-teal-300" />
+              <span>⚙️ Mipangilio ya Ulinzi</span>
+            </button>
+          )}
+
+          {onOpenAdminBackupModal && (
+            <button
+              onClick={onOpenAdminBackupModal}
+              className="flex-1 md:flex-initial px-4 py-3 rounded-2xl bg-purple-700 hover:bg-purple-600 text-white font-extrabold text-sm shadow-md transition-all flex items-center justify-center gap-2 cursor-pointer"
+              title="Pakua na Pakia Data za Mfumo (Backup / Restore)"
+            >
+              <Database className="w-4 h-4" />
+              <span>💾 Pakua & Pakia Data</span>
+            </button>
+          )}
+
+          {onOpenAdminPractitionersModal && (
+            <button
+              onClick={onOpenAdminPractitionersModal}
+              className="flex-1 md:flex-initial px-4 py-3 rounded-2xl bg-blue-600 hover:bg-blue-500 text-white font-extrabold text-sm shadow-md transition-all flex items-center justify-center gap-2 cursor-pointer"
+              title="Wasajili na kuwasimamia madaktari na wataalamu wa lishe"
+            >
+              <Users className="w-4 h-4" />
+              <span>🩺 Wasajili Madaktari & Wataalamu</span>
+            </button>
+          )}
+
           <button
             onClick={() => onOpenRegisterModal('kisukari')}
             className="flex-1 md:flex-initial px-4 py-3 rounded-2xl bg-teal-600 hover:bg-teal-500 text-white font-extrabold text-sm shadow-md transition-all flex items-center justify-center gap-2 cursor-pointer"
@@ -332,69 +408,101 @@ export const NutritionistPortalView: React.FC<NutritionistPortalViewProps> = ({
       </div>
 
       {/* Metric Counters Grid */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
+      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
         <div 
           onClick={() => setFilterCategory('all')}
-          className={`p-4 rounded-2xl border transition-all cursor-pointer ${
+          className={`p-3.5 rounded-2xl border transition-all cursor-pointer ${
             filterCategory === 'all' 
               ? 'bg-white border-teal-500 shadow-md ring-2 ring-teal-500/20' 
               : 'bg-white hover:bg-slate-50 border-slate-200 shadow-xs'
           }`}
         >
-          <div className="flex items-center justify-between text-slate-500 mb-2">
-            <span className="text-xs font-bold uppercase tracking-wider">Jumla ya Wateja</span>
+          <div className="flex items-center justify-between text-slate-500 mb-1.5">
+            <span className="text-[11px] font-bold uppercase tracking-wider">Jumla</span>
             <Users className="w-4 h-4 text-teal-600" />
           </div>
-          <p className="text-2xl sm:text-3xl font-black text-slate-900">{totalCount}</p>
-          <span className="text-[11px] font-semibold text-teal-700">Wagonjwa & Wateja wote</span>
+          <p className="text-2xl font-black text-slate-900">{totalCount}</p>
+          <span className="text-[10px] font-semibold text-teal-700">Wagonjwa Wote</span>
         </div>
 
         <div 
           onClick={() => setFilterCategory('kisukari')}
-          className={`p-4 rounded-2xl border transition-all cursor-pointer ${
+          className={`p-3.5 rounded-2xl border transition-all cursor-pointer ${
             filterCategory === 'kisukari' 
               ? 'bg-rose-50/70 border-rose-500 shadow-md ring-2 ring-rose-500/20' 
               : 'bg-white hover:bg-slate-50 border-slate-200 shadow-xs'
           }`}
         >
-          <div className="flex items-center justify-between text-rose-600 mb-2">
-            <span className="text-xs font-bold uppercase tracking-wider">Wagonjwa wa Kisukari</span>
+          <div className="flex items-center justify-between text-rose-600 mb-1.5">
+            <span className="text-[11px] font-bold uppercase tracking-wider">Kisukari</span>
             <HeartPulse className="w-4 h-4 text-rose-600" />
           </div>
-          <p className="text-2xl sm:text-3xl font-black text-slate-900">{diabetesCount}</p>
-          <span className="text-[11px] font-semibold text-rose-700">Usimamizi wa Sukari & Wanga</span>
+          <p className="text-2xl font-black text-slate-900">{diabetesCount}</p>
+          <span className="text-[10px] font-semibold text-rose-700">Sukari & Wanga</span>
+        </div>
+
+        <div 
+          onClick={() => setFilterCategory('shinikizo_la_damu')}
+          className={`p-3.5 rounded-2xl border transition-all cursor-pointer ${
+            filterCategory === 'shinikizo_la_damu' 
+              ? 'bg-rose-50/70 border-rose-600 shadow-md ring-2 ring-rose-600/20' 
+              : 'bg-white hover:bg-slate-50 border-slate-200 shadow-xs'
+          }`}
+        >
+          <div className="flex items-center justify-between text-rose-700 mb-1.5">
+            <span className="text-[11px] font-bold uppercase tracking-wider">Presha (BP)</span>
+            <Activity className="w-4 h-4 text-rose-600" />
+          </div>
+          <p className="text-2xl font-black text-slate-900">{bpCount}</p>
+          <span className="text-[10px] font-semibold text-rose-700">Shinikizo la Damu</span>
         </div>
 
         <div 
           onClick={() => setFilterCategory('kupunguza_uzito')}
-          className={`p-4 rounded-2xl border transition-all cursor-pointer ${
+          className={`p-3.5 rounded-2xl border transition-all cursor-pointer ${
             filterCategory === 'kupunguza_uzito' 
               ? 'bg-emerald-50/70 border-emerald-500 shadow-md ring-2 ring-emerald-500/20' 
               : 'bg-white hover:bg-slate-50 border-slate-200 shadow-xs'
           }`}
         >
-          <div className="flex items-center justify-between text-emerald-600 mb-2">
-            <span className="text-xs font-bold uppercase tracking-wider">Kliniki ya Uzito</span>
+          <div className="flex items-center justify-between text-emerald-600 mb-1.5">
+            <span className="text-[11px] font-bold uppercase tracking-wider">Uzito</span>
             <Scale className="w-4 h-4 text-emerald-600" />
           </div>
-          <p className="text-2xl sm:text-3xl font-black text-slate-900">{weightLossCount}</p>
-          <span className="text-[11px] font-semibold text-emerald-700">Wanaopunguza Uzito (Weight Loss)</span>
+          <p className="text-2xl font-black text-slate-900">{weightLossCount}</p>
+          <span className="text-[10px] font-semibold text-emerald-700">Kupunguza Uzito</span>
+        </div>
+
+        <div 
+          onClick={() => setFilterCategory('watoto_lishe')}
+          className={`p-3.5 rounded-2xl border transition-all cursor-pointer ${
+            filterCategory === 'watoto_lishe' 
+              ? 'bg-amber-50/70 border-amber-500 shadow-md ring-2 ring-amber-500/20' 
+              : 'bg-white hover:bg-slate-50 border-slate-200 shadow-xs'
+          }`}
+        >
+          <div className="flex items-center justify-between text-amber-600 mb-1.5">
+            <span className="text-[11px] font-bold uppercase tracking-wider">Watoto</span>
+            <Baby className="w-4 h-4 text-amber-600" />
+          </div>
+          <p className="text-2xl font-black text-slate-900">{childrenCount}</p>
+          <span className="text-[10px] font-semibold text-amber-700">Ulaji & Lishe</span>
         </div>
 
         <div 
           onClick={() => setFilterCategory('lishe_jumla')}
-          className={`p-4 rounded-2xl border transition-all cursor-pointer ${
+          className={`p-3.5 rounded-2xl border transition-all cursor-pointer ${
             filterCategory === 'lishe_jumla' 
               ? 'bg-teal-50/70 border-teal-500 shadow-md ring-2 ring-teal-500/20' 
               : 'bg-white hover:bg-slate-50 border-slate-200 shadow-xs'
           }`}
         >
-          <div className="flex items-center justify-between text-teal-600 mb-2">
-            <span className="text-xs font-bold uppercase tracking-wider">Ushauri wa Jumla</span>
+          <div className="flex items-center justify-between text-teal-600 mb-1.5">
+            <span className="text-[11px] font-bold uppercase tracking-wider">Lishe Jumla</span>
             <Activity className="w-4 h-4 text-teal-600" />
           </div>
-          <p className="text-2xl sm:text-3xl font-black text-slate-900">{generalCount}</p>
-          <span className="text-[11px] font-semibold text-teal-700">Lishe Bora & Kinga ya Mwili</span>
+          <p className="text-2xl font-black text-slate-900">{generalCount}</p>
+          <span className="text-[10px] font-semibold text-teal-700">Ushauri wa Jumla</span>
         </div>
       </div>
 
@@ -455,6 +563,16 @@ export const NutritionistPortalView: React.FC<NutritionistPortalViewProps> = ({
               >
                 Uzito ({weightLossCount})
               </button>
+              <button
+                onClick={() => setFilterCategory('watoto_lishe')}
+                className={`px-2.5 py-1 rounded-lg whitespace-nowrap transition-colors ${
+                  filterCategory === 'watoto_lishe'
+                    ? 'bg-amber-600 text-white'
+                    : 'bg-amber-50 text-amber-800 hover:bg-amber-100'
+                }`}
+              >
+                Watoto ({childrenCount})
+              </button>
             </div>
 
             {/* Scrollable Patient Cards */}
@@ -475,6 +593,7 @@ export const NutritionistPortalView: React.FC<NutritionistPortalViewProps> = ({
                   const patientBmi = calculateBmi(patient.currentWeightKg, patient.heightCm);
                   const isDiabetes = patient.category === 'kisukari';
                   const isWeightLoss = patient.category === 'kupunguza_uzito';
+                  const isChild = patient.category === 'watoto_lishe' || patient.age < 18;
 
                   return (
                     <div
@@ -500,11 +619,12 @@ export const NutritionistPortalView: React.FC<NutritionistPortalViewProps> = ({
                         </div>
 
                         <span className={`text-[10px] font-black px-2 py-0.5 rounded-md whitespace-nowrap uppercase tracking-wide ${
+                          isChild ? 'bg-amber-100 text-amber-800' :
                           isDiabetes ? 'bg-rose-100 text-rose-800' :
                           isWeightLoss ? 'bg-emerald-100 text-emerald-800' :
                           'bg-teal-100 text-teal-800'
                         }`}>
-                          {isDiabetes ? 'Kisukari' : isWeightLoss ? 'Kupunguza Uzito' : 'Lishe Jumla'}
+                          {isChild ? 'Watoto & Ulaji' : isDiabetes ? 'Kisukari' : isWeightLoss ? 'Kupunguza Uzito' : 'Lishe Jumla'}
                         </span>
                       </div>
 
@@ -557,6 +677,45 @@ export const NutritionistPortalView: React.FC<NutritionistPortalViewProps> = ({
 
                   {/* Actions for this patient */}
                   <div className="flex items-center gap-2 flex-wrap">
+                    {/* AI Analysis Button */}
+                    <button
+                      onClick={() => setIsAIAnalysisModalOpen(true)}
+                      className="px-3.5 py-2 rounded-xl bg-gradient-to-r from-emerald-600 via-teal-600 to-teal-700 hover:from-emerald-500 hover:to-teal-600 active:scale-95 text-white text-xs font-black shadow-md shadow-teal-700/20 transition-all flex items-center gap-1.5 cursor-pointer"
+                      title="Uchambuzi wa AI (Gemini): Chambua mwenendo wa vipimo na kutoa mapendekezo ya lishe na tahadhari"
+                    >
+                      <Sparkles className="w-3.5 h-3.5 text-emerald-200" />
+                      <span>Uchambuzi wa AI</span>
+                    </button>
+
+                    {/* Patient Referral Button */}
+                    <button
+                      onClick={() => setIsReferralModalOpen(true)}
+                      className="px-3.5 py-2 rounded-xl bg-blue-50 hover:bg-blue-100 text-blue-800 border border-blue-200 text-xs font-bold transition-colors flex items-center gap-1.5 cursor-pointer"
+                      title="Andika au tazama barua ya rufaa kwa daktari bingwa"
+                    >
+                      <Send className="w-3.5 h-3.5 text-blue-600" />
+                      <span>Rufaa ({selectedPatient.referrals?.length || 0})</span>
+                    </button>
+
+                    {/* Edit Patient Info Button */}
+                    <button
+                      onClick={() => setIsEditingPatientModalOpen(true)}
+                      className="px-3 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 border border-slate-300 text-xs font-bold transition-colors flex items-center gap-1.5 cursor-pointer"
+                      title="Rekebisha taarifa za mgonjwa huyu"
+                    >
+                      <Edit3 className="w-3.5 h-3.5 text-slate-600" />
+                      <span>Rekebisha</span>
+                    </button>
+
+                    {/* Delete Patient Button */}
+                    <button
+                      onClick={() => setIsDeleteConfirmOpen(true)}
+                      className="p-2 rounded-xl bg-rose-50 hover:bg-rose-100 text-rose-600 border border-rose-200 text-xs font-bold transition-colors flex items-center justify-center cursor-pointer"
+                      title="Ondoa mgonjwa huyu kwenye orodha ya kliniki"
+                    >
+                      <Trash2 className="w-4 h-4" />
+                    </button>
+
                     <button
                       onClick={() => onSelectActivePatientForView(selectedPatient)}
                       className="px-3.5 py-2 rounded-xl bg-slate-900 hover:bg-slate-800 text-white text-xs font-bold shadow-xs transition-colors flex items-center gap-1.5 cursor-pointer"
@@ -867,7 +1026,137 @@ export const NutritionistPortalView: React.FC<NutritionistPortalViewProps> = ({
                 )}
               </div>
 
-              {/* Nutritionist Prescriptions & Meal Plan Section */}
+              {/* Sub-tabs Navigation for Selected Patient */}
+              <div className="flex items-center gap-2 border-b border-slate-200 pb-3 overflow-x-auto text-xs font-bold">
+                <button
+                  type="button"
+                  onClick={() => setPatientSubTab('prescriptions')}
+                  className={`px-4 py-2 rounded-xl transition-all cursor-pointer flex items-center gap-2 ${
+                    patientSubTab === 'prescriptions'
+                      ? 'bg-teal-700 text-white shadow-xs'
+                      : 'bg-white text-slate-600 hover:bg-slate-100 border border-slate-200'
+                  }`}
+                >
+                  <FileText className="w-4 h-4" />
+                  <span>Mpango wa Chakula & Ushauri ({selectedPatient.prescriptions?.length || 0})</span>
+                </button>
+
+                {(selectedPatient.category === 'watoto_lishe' || selectedPatient.age < 18 || selectedPatient.childProfile) && (
+                  <button
+                    type="button"
+                    onClick={() => setPatientSubTab('pediatric')}
+                    className={`px-4 py-2 rounded-xl transition-all cursor-pointer flex items-center gap-2 ${
+                      patientSubTab === 'pediatric'
+                        ? 'bg-amber-600 text-white shadow-xs'
+                        : 'bg-amber-50 text-amber-900 hover:bg-amber-100 border border-amber-200'
+                    }`}
+                  >
+                    <Baby className="w-4 h-4 text-amber-500" />
+                    <span>Ufuatiliaji wa Mtoto & Ulaji</span>
+                  </button>
+                )}
+
+                <button
+                  type="button"
+                  onClick={() => setPatientSubTab('referrals')}
+                  className={`px-4 py-2 rounded-xl transition-all cursor-pointer flex items-center gap-2 ${
+                    patientSubTab === 'referrals'
+                      ? 'bg-blue-600 text-white shadow-xs'
+                      : 'bg-white text-slate-600 hover:bg-slate-100 border border-slate-200'
+                  }`}
+                >
+                  <Send className="w-4 h-4" />
+                  <span>Rufaa za Kliniki ({selectedPatient.referrals?.length || 0})</span>
+                </button>
+              </div>
+
+              {/* Sub-tab 1: Pediatric Tracker */}
+              {patientSubTab === 'pediatric' && (
+                <ChildNutritionTrackerView
+                  patient={selectedPatient}
+                  onUpdatePatient={onUpdatePatient}
+                />
+              )}
+
+              {/* Sub-tab 2: Referrals Overview */}
+              {patientSubTab === 'referrals' && (
+                <div className="bg-white rounded-3xl p-5 sm:p-6 border border-slate-200 shadow-xs space-y-4">
+                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-slate-100 pb-4">
+                    <div>
+                      <h4 className="text-base font-black text-slate-900 flex items-center gap-2">
+                        <Send className="w-5 h-5 text-blue-600" />
+                        <span>Kumbukumbu ya Rufaa za Mgonjwa: {selectedPatient.fullName}</span>
+                      </h4>
+                      <p className="text-xs text-slate-500">
+                        Orodha ya rufaa zilizotolewa kwa madaktari bingwa au vituo vingine vya afya
+                      </p>
+                    </div>
+
+                    <button
+                      type="button"
+                      onClick={() => setIsReferralModalOpen(true)}
+                      className="px-4 py-2 rounded-xl bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold shadow-xs transition-colors flex items-center gap-1.5 cursor-pointer self-start sm:self-auto"
+                    >
+                      <PlusCircle className="w-4 h-4" />
+                      <span>Andika Barua Mpya ya Rufaa</span>
+                    </button>
+                  </div>
+
+                  {(!selectedPatient.referrals || selectedPatient.referrals.length === 0) ? (
+                    <div className="text-center py-10 text-slate-500 space-y-3">
+                      <p className="text-xs">Mgonjwa huyu bado hajapewa rufaa yoyote ya kliniki.</p>
+                      <button
+                        type="button"
+                        onClick={() => setIsReferralModalOpen(true)}
+                        className="text-xs font-bold text-blue-600 hover:underline"
+                      >
+                        + Andika Rufaa ya Kwanza
+                      </button>
+                    </div>
+                  ) : (
+                    <div className="space-y-3">
+                      {selectedPatient.referrals.map((ref) => (
+                        <div key={ref.id} className="p-4 rounded-2xl border border-slate-200 bg-slate-50/70 space-y-2">
+                          <div className="flex flex-wrap items-center justify-between gap-2">
+                            <div className="flex items-center gap-2">
+                              <span className={`text-[10px] font-black uppercase px-2 py-0.5 rounded-full ${
+                                ref.priority === 'dharura' ? 'bg-rose-100 text-rose-800' :
+                                ref.priority === 'ya_haraka' ? 'bg-amber-100 text-amber-800' :
+                                'bg-blue-100 text-blue-800'
+                              }`}>
+                                {ref.priority === 'dharura' ? 'DHARURA' : ref.priority === 'ya_haraka' ? 'HARAKA' : 'KAWAIDA'}
+                              </span>
+                              <span className="text-xs font-black text-slate-900">
+                                {ref.targetFacility} ({ref.targetDepartment})
+                              </span>
+                              <span className="text-[10px] bg-slate-200 text-slate-700 px-2 py-0.5 rounded-md font-bold">
+                                {ref.referralNumber}
+                              </span>
+                            </div>
+                            <span className="text-[11px] text-slate-400 font-semibold">{ref.date}</span>
+                          </div>
+
+                          <div className="text-xs text-slate-700 space-y-1">
+                            <p><strong>Utambuzi wa Msingi:</strong> {ref.primaryDiagnosis}</p>
+                            <p><strong>Sababu ya Rufaa:</strong> {ref.reasonForReferral}</p>
+                            <p className="text-slate-600 bg-white p-2.5 rounded-xl border border-slate-200">
+                              <strong>Muhtasari wa Kliniki:</strong> {ref.clinicalSummary}
+                            </p>
+                            {ref.notesToSpecialist && (
+                              <p className="text-blue-900 bg-blue-50 p-2 rounded-xl">
+                                <strong>Ujumbe kwa Daktari Bingwa:</strong> {ref.notesToSpecialist}
+                              </p>
+                            )}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {/* Sub-tab 3: Nutritionist Prescriptions & Meal Plan Section */}
+              {patientSubTab === 'prescriptions' && (
               <div className="bg-white rounded-3xl p-5 sm:p-6 border border-slate-200 shadow-xs space-y-5">
                 <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-slate-100 pb-4">
                   <div>
@@ -1175,6 +1464,7 @@ export const NutritionistPortalView: React.FC<NutritionistPortalViewProps> = ({
                   )}
                 </div>
               </div>
+              )}
 
             </div>
           ) : (
@@ -1189,6 +1479,97 @@ export const NutritionistPortalView: React.FC<NutritionistPortalViewProps> = ({
         </div>
 
       </div>
+
+      {/* Edit Patient Modal */}
+      {selectedPatient && (
+        <EditPatientModal
+          isOpen={isEditingPatientModalOpen}
+          onClose={() => setIsEditingPatientModalOpen(false)}
+          patient={selectedPatient}
+          onSave={(updated) => {
+            onUpdatePatient(updated);
+            setIsEditingPatientModalOpen(false);
+          }}
+        />
+      )}
+
+      {/* Patient Referral Modal */}
+      {selectedPatient && (
+        <PatientReferralModal
+          isOpen={isReferralModalOpen}
+          onClose={() => setIsReferralModalOpen(false)}
+          patient={selectedPatient}
+          onSaveReferral={(newRef) => {
+            const updatedRefs = [newRef, ...(selectedPatient.referrals || [])];
+            onUpdatePatient({
+              ...selectedPatient,
+              referrals: updatedRefs,
+            });
+            setIsReferralModalOpen(false);
+            setPatientSubTab('referrals');
+          }}
+        />
+      )}
+
+      {/* Patient AI Analysis Modal */}
+      {selectedPatient && (
+        <PatientAIAnalysisModal
+          isOpen={isAIAnalysisModalOpen}
+          onClose={() => setIsAIAnalysisModalOpen(false)}
+          patient={selectedPatient}
+          glucoseLogs={glucoseLogs}
+          mealLogs={mealLogs}
+          onApplyRecommendations={(instructions, targets) => {
+            setDietaryInstructions(instructions);
+            if (targets?.calories) setTargetCalories(targets.calories);
+            if (targets?.carbs) setTargetCarbs(targets.carbs);
+            if (targets?.protein) setTargetProtein(targets.protein);
+            if (targets?.fiber) setTargetFiber(targets.fiber);
+            setPatientSubTab('prescriptions');
+            setIsAddingPrescription(true);
+          }}
+        />
+      )}
+
+      {/* Delete Patient Confirmation Modal */}
+      {isDeleteConfirmOpen && selectedPatient && (
+        <div className="fixed inset-0 z-50 bg-slate-900/80 backdrop-blur-sm flex items-center justify-center p-4">
+          <div className="bg-white rounded-3xl p-6 max-w-md w-full border border-slate-200 shadow-2xl space-y-4 animate-in fade-in zoom-in-95 duration-150">
+            <div className="w-12 h-12 rounded-2xl bg-rose-100 text-rose-600 flex items-center justify-center mx-auto">
+              <Trash2 className="w-6 h-6" />
+            </div>
+            <div className="text-center space-y-1.5">
+              <h3 className="text-base font-black text-slate-900">
+                Ondoa Taarifa za {selectedPatient.fullName}?
+              </h3>
+              <p className="text-xs text-slate-600 leading-relaxed">
+                Kitendo hiki kitaondoa faili la mgonjwa huyu kwenye orodha ya kliniki pamoja na historia yake ya uzito na maelekezo ya lishe.
+              </p>
+            </div>
+            <div className="flex items-center justify-center gap-3 pt-2">
+              <button
+                type="button"
+                onClick={() => setIsDeleteConfirmOpen(false)}
+                className="px-4 py-2 rounded-xl border border-slate-300 text-xs font-bold text-slate-700 hover:bg-slate-100 cursor-pointer"
+              >
+                Ghairi
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  if (onDeletePatient) {
+                    onDeletePatient(selectedPatient.id);
+                  }
+                  setIsDeleteConfirmOpen(false);
+                }}
+                className="px-5 py-2 rounded-xl bg-rose-600 hover:bg-rose-700 text-white text-xs font-bold shadow-sm cursor-pointer"
+              >
+                Ndio, Ondoa Mgonjwa
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

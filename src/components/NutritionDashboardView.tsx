@@ -2,9 +2,19 @@ import React from 'react';
 import { 
   Activity, Flame, Scale, ShieldCheck, Plus, Camera, HeartPulse, 
   Calendar, Clock, Trash2, Sparkles, ChevronRight, AlertCircle, 
-  CheckCircle2, ArrowUpRight, Megaphone, Pin, ArrowRight, BookOpen, Bell, BellOff, Printer
+  CheckCircle2, ArrowUpRight, Megaphone, Pin, ArrowRight, BookOpen, Bell, BellOff, Printer,
+  HardDrive, UploadCloud, Palette
 } from 'lucide-react';
-import { GlucoseLog, MealLog, NutritionAnnouncement, UserProfile } from '../types';
+import { AuthSession, DashboardTheme, GlucoseLog, MealLog, NutritionAnnouncement, UserProfile } from '../types';
+import { WaterIntakeTracker } from './WaterIntakeTracker';
+import { DASHBOARD_THEMES } from '../utils/theme';
+
+const cleanGreetingName = (name: string) => {
+  return (name || '')
+    .replace(/Mgonjwa wa Kisukari\s*\(?/gi, '')
+    .replace(/\)/g, '')
+    .trim() || 'Mpendwa';
+};
 
 interface NutritionDashboardViewProps {
   meals: MealLog[];
@@ -15,6 +25,11 @@ interface NutritionDashboardViewProps {
   onOpenGlucoseModal: () => void;
   onSelectTab: (tab: any) => void;
   onDeleteMeal: (mealId: string) => void;
+  onOpenDriveModal?: () => void;
+  onOpenGitHubModal?: () => void;
+  currentTheme?: DashboardTheme;
+  onOpenThemeModal?: () => void;
+  authSession?: AuthSession | null;
 }
 
 export const NutritionDashboardView: React.FC<NutritionDashboardViewProps> = ({
@@ -26,7 +41,13 @@ export const NutritionDashboardView: React.FC<NutritionDashboardViewProps> = ({
   onOpenGlucoseModal,
   onSelectTab,
   onDeleteMeal,
+  onOpenDriveModal,
+  onOpenGitHubModal,
+  currentTheme = 'emerald',
+  onOpenThemeModal,
+  authSession,
 }) => {
+  const activeTheme = DASHBOARD_THEMES[currentTheme] || DASHBOARD_THEMES.emerald;
   // Calculate today's totals
   const today = new Date().toDateString();
   const todayMeals = meals.filter(
@@ -49,26 +70,38 @@ export const NutritionDashboardView: React.FC<NutritionDashboardViewProps> = ({
   return (
     <div className="space-y-6 max-w-6xl mx-auto">
       {/* Top Banner: Patient Overview & Quick Action Hero */}
-      <div className="bg-gradient-to-r from-emerald-800 via-teal-900 to-slate-900 text-white rounded-3xl p-6 sm:p-8 shadow-xl relative overflow-hidden">
+      <div className={`bg-gradient-to-r ${activeTheme.bannerGradient} text-white rounded-3xl p-6 sm:p-8 shadow-xl relative overflow-hidden`}>
         <div className="relative z-10 flex flex-col md:flex-row md:items-center justify-between gap-6">
           <div className="space-y-2">
-            <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-emerald-500/20 text-emerald-300 text-xs font-semibold border border-emerald-500/30">
+            <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-white/15 text-white text-xs font-semibold border border-white/20">
               <Activity className="w-3.5 h-3.5" />
               <span>Ufuatiliaji wa Lishe wa Leo • {new Date().toLocaleDateString('sw-TZ', { weekday: 'long', day: 'numeric', month: 'long' })}</span>
             </div>
             <h1 className="text-2xl sm:text-3xl font-extrabold tracking-tight">
-              Habari, {profile.name}
+              Habari ya Leo, Karibu AfyaLishe
             </h1>
-            <p className="text-sm text-slate-300 max-w-xl">
+            {authSession && (
+              <div className="flex items-center gap-2 pt-0.5">
+                <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-white/20 text-white text-xs font-black backdrop-blur-xs border border-white/30">
+                  <ShieldCheck className="w-3.5 h-3.5 text-amber-300" />
+                  {authSession.role === 'admin' 
+                    ? 'Msimamizi wa Mfumo' 
+                    : authSession.role === 'practitioner' 
+                    ? 'Mtaalamu wa Lishe' 
+                    : 'Akaunti ya Mgonjwa (PIN Imethibitishwa)'}
+                </span>
+              </div>
+            )}
+            <p className="text-sm text-slate-200/90 max-w-xl pt-1">
               Hali ya {profile.diabetesType === 'type2' ? 'Kisukari cha Aina ya 2' : profile.diabetesType === 'type1' ? 'Kisukari cha Aina ya 1' : 'Kisukari'}. 
-              Wanga wako wa leo uko chini ya udhibiti madhubuti wa lishe.
+              Wanga na lishe yako ya leo iko chini ya udhibiti madhubuti wa kiafya.
             </p>
           </div>
 
           <div className="flex flex-wrap sm:flex-nowrap gap-3">
             <button
               onClick={onOpenScanner}
-              className="flex-1 sm:flex-none px-5 py-3 rounded-2xl bg-emerald-500 hover:bg-emerald-600 text-white font-bold text-sm shadow-lg shadow-emerald-500/30 transition-all flex items-center justify-center gap-2 active:scale-95"
+              className={`flex-1 sm:flex-none px-5 py-3 rounded-2xl ${activeTheme.primaryButton} font-bold text-sm shadow-lg transition-all flex items-center justify-center gap-2 active:scale-95 cursor-pointer`}
             >
               <Camera className="w-4 h-4" />
               <span>Piga Picha ya Mlo</span>
@@ -76,11 +109,33 @@ export const NutritionDashboardView: React.FC<NutritionDashboardViewProps> = ({
 
             <button
               onClick={onOpenGlucoseModal}
-              className="flex-1 sm:flex-none px-5 py-3 rounded-2xl bg-white/10 hover:bg-white/20 text-white font-semibold text-sm border border-white/20 backdrop-blur-xs transition-all flex items-center justify-center gap-2"
+              className="flex-1 sm:flex-none px-5 py-3 rounded-2xl bg-white/10 hover:bg-white/20 text-white font-semibold text-sm border border-white/20 backdrop-blur-xs transition-all flex items-center justify-center gap-2 cursor-pointer"
             >
               <HeartPulse className="w-4 h-4 text-rose-400" />
               <span>Weka Sukari</span>
             </button>
+
+            {onOpenThemeModal && (
+              <button
+                onClick={onOpenThemeModal}
+                className="flex-1 sm:flex-none px-4 py-3 rounded-2xl bg-white/15 hover:bg-white/25 text-white font-semibold text-sm border border-white/25 backdrop-blur-xs transition-all flex items-center justify-center gap-2 cursor-pointer"
+                title="Badilisha Mandhari ya Dashibodi"
+              >
+                <Palette className="w-4 h-4 text-amber-300" />
+                <span>Mandhari</span>
+              </button>
+            )}
+
+            {onOpenDriveModal && (
+              <button
+                onClick={onOpenDriveModal}
+                className="flex-1 sm:flex-none px-4 py-3 rounded-2xl bg-sky-500/20 hover:bg-sky-500/30 text-sky-200 font-semibold text-sm border border-sky-400/30 backdrop-blur-xs transition-all flex items-center justify-center gap-2 cursor-pointer"
+                title="Google Drive Cloud Backup"
+              >
+                <HardDrive className="w-4 h-4 text-sky-300" />
+                <span>Google Drive</span>
+              </button>
+            )}
           </div>
         </div>
       </div>
@@ -305,6 +360,13 @@ export const NutritionDashboardView: React.FC<NutritionDashboardViewProps> = ({
           </div>
         );
       })()}
+
+      {/* Hydration / Water Intake Tracker */}
+      <WaterIntakeTracker
+        patientId={profile.name}
+        patientName={cleanGreetingName(profile.name)}
+        latestGlucose={latestGlucose}
+      />
 
       {/* Card 4: Matangazo & Taarifa za Hivi Punde za Kilishe */}
       {announcements.length > 0 && (

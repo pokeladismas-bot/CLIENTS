@@ -28,11 +28,13 @@ export const NutritionistChatView: React.FC<NutritionistChatViewProps> = ({
   latestGlucose,
   recentMeals,
 }) => {
+  const cleanName = (profile.name || '').replace(/Mgonjwa wa Kisukari\s*\(?/gi, '').replace(/\)/g, '').trim() || 'Mpendwa';
+
   const [messages, setMessages] = useState<Message[]>([
     {
       id: 'welcome',
       role: 'assistant',
-      content: `Habari ${profile.name}! Mimi ni AfyaLishe AI, Mshauri wako wa Lishe ya Kisukari. 
+      content: `Habari ${cleanName}! Mimi ni AfyaLishe AI, Mshauri wako wa Lishe ya Kisukari. 
 
 Ninaweza kukusaidia kuchagua vyakula vinavyofaa, kupima wanga wa milo ya kitanzania (Ugali wa dona/ulezi, ndizi, samaki, mboga za majani), na kutoa ushauri maalum kulingana na kiwango chako cha sasa cha sukari (${latestGlucose ? `${latestGlucose.value} mg/dL` : 'Haijarekodiwa leo'}).
 

@@ -21,32 +21,55 @@ import { GlucoseLogModal } from './components/GlucoseLogModal';
 import { ProfileModal } from './components/ProfileModal';
 import { PrintDietaryReportModal } from './components/PrintDietaryReportModal';
 import { AuthModal } from './components/AuthModal';
+import { GitHubSyncModal } from './components/GitHubSyncModal';
+import { GoogleDriveModal } from './components/GoogleDriveModal';
+import { BloodPressureClinicView } from './components/BloodPressureClinicView';
+import { FoodPlateGuideView } from './components/FoodPlateGuideView';
+import { NearbyOnlineDoctorView } from './components/NearbyOnlineDoctorView';
+import { OfflinePrintableEatingPlanModal } from './components/OfflinePrintableEatingPlanModal';
+import { MealAndWaterReminderModal } from './components/MealAndWaterReminderModal';
+import { AdminPractitionersModal } from './components/AdminPractitionersModal';
+import { ChildNutritionTrackerView } from './components/ChildNutritionTrackerView';
+import { ThemeSwitcherModal } from './components/ThemeSwitcherModal';
+import { AuthGateView } from './components/AuthGateView';
+import { AppInstallerModal } from './components/AppInstallerModal';
+import { ClinicalSecuritySettingsModal } from './components/ClinicalSecuritySettingsModal';
+import { DASHBOARD_THEMES, getSavedTheme, saveTheme } from './utils/theme';
+import { testFirestoreConnection } from './services/firebase';
 import { 
   INITIAL_ANNOUNCEMENTS,
+  INITIAL_BLOOD_PRESSURE_LOGS,
   INITIAL_GLUCOSE_LOGS, 
   INITIAL_MEAL_LOGS, 
   INITIAL_REGISTERED_PATIENTS,
-  INITIAL_USER_PROFILE 
+  INITIAL_USER_PROFILE,
+  SAMPLE_ONLINE_DOCTORS
 } from './data/sampleData';
 import { 
   AuthSession,
+  BloodPressureLog,
   ClientCategory, 
   GlucoseLog, 
   MealLog, 
   NutritionAnnouncement, 
+  OnlineDoctor,
   PortalMode, 
   RegisteredPatient, 
   SecuritySettings,
   UserProfile,
-  UserRole
+  UserRole,
+  DashboardTheme
 } from './types';
-import { Bell, HeartPulse, X, ChevronRight } from 'lucide-react';
+import { Bell, HeartPulse, X, ChevronRight, HardDrive, UploadCloud } from 'lucide-react';
 import { playReminderChime } from './utils/reminderSound';
 
 const DEFAULT_SECURITY_SETTINGS: SecuritySettings = {
   adminPassword: 'admin123',
+  adminName: 'DISMAS POKELA',
+  adminEmail: 'dismaspokela@gmail.com',
   allowPatientPrinting: true,
   requireAdminApprovalForExport: false,
+  requireLoginFirst: true,
 };
 
 export default function App() {
@@ -66,6 +89,10 @@ export default function App() {
   const [isRegisterModalOpen, setIsRegisterModalOpen] = useState<boolean>(false);
   const [registerInitialCategory, setRegisterInitialCategory] = useState<ClientCategory>('kisukari');
   const [printReportLog, setPrintReportLog] = useState<GlucoseLog | null>(null);
+  const [isGitHubModalOpen, setIsGitHubModalOpen] = useState<boolean>(false);
+  const [isDriveModalOpen, setIsDriveModalOpen] = useState<boolean>(false);
+  const [isOfflinePlanModalOpen, setIsOfflinePlanModalOpen] = useState<boolean>(false);
+  const [isRemindersModalOpen, setIsRemindersModalOpen] = useState<boolean>(false);
 
   // In-app daily reminder toast state
   const [isReminderAlertVisible, setIsReminderAlertVisible] = useState<boolean>(false);
@@ -97,6 +124,16 @@ export default function App() {
     return saved ? JSON.parse(saved) : INITIAL_GLUCOSE_LOGS;
   });
 
+  const [bloodPressureLogs, setBloodPressureLogs] = useState<BloodPressureLog[]>(() => {
+    const saved = localStorage.getItem('afyalishe_bp_logs');
+    return saved ? JSON.parse(saved) : INITIAL_BLOOD_PRESSURE_LOGS;
+  });
+
+  const [waterGlassesToday, setWaterGlassesToday] = useState<number>(() => {
+    const saved = localStorage.getItem('afyalishe_water_today');
+    return saved ? Number(saved) : 4;
+  });
+
   const [announcements, setAnnouncements] = useState<NutritionAnnouncement[]>(() => {
     const saved = localStorage.getItem('afyalishe_announcements');
     return saved ? JSON.parse(saved) : INITIAL_ANNOUNCEMENTS;
@@ -117,17 +154,83 @@ export default function App() {
         return null;
       }
     }
-    return {
-      role: 'admin',
-      username: 'admin',
-      name: 'Dkt. Grace Kimaro (Mtaalam wa Lishe)',
-      loginTime: new Date().toISOString(),
-      canPrintReports: true,
-    };
+    // If requireLoginFirst is enabled, require password by starting unauthenticated
+    return null;
   });
 
   const [isAuthModalOpen, setIsAuthModalOpen] = useState<boolean>(false);
   const [authModalRole, setAuthModalRole] = useState<UserRole>('patient');
+
+  // Dashboard Theme State
+  const [currentTheme, setCurrentTheme] = useState<DashboardTheme>(getSavedTheme);
+  const [isThemeModalOpen, setIsThemeModalOpen] = useState<boolean>(false);
+
+  // PWA App Installer Modal State (Admin & Practitioner installation system)
+  const [isInstallerModalOpen, setIsInstallerModalOpen] = useState<boolean>(false);
+  const [isSecuritySettingsModalOpen, setIsSecuritySettingsModalOpen] = useState<boolean>(false);
+  const [systemLockNotice, setSystemLockNotice] = useState<string | null>(null);
+
+  const handleSelectTheme = (theme: DashboardTheme) => {
+    setCurrentTheme(theme);
+    saveTheme(theme);
+  };
+
+  useEffect(() => {
+    saveTheme(currentTheme);
+    testFirestoreConnection();
+  }, [currentTheme]);
+
+  // Practitioners & Doctors Management (Admin Portal)
+  const [doctors, setDoctors] = useState<OnlineDoctor[]>(() => {
+    const saved = localStorage.getItem('afyalishe_online_doctors');
+    return saved ? JSON.parse(saved) : SAMPLE_ONLINE_DOCTORS;
+  });
+
+  const [isAdminPractitionersModalOpen, setIsAdminPractitionersModalOpen] = useState<boolean>(false);
+
+  useEffect(() => {
+    localStorage.setItem('afyalishe_online_doctors', JSON.stringify(doctors));
+  }, [doctors]);
+
+  const handleSaveDoctor = (doc: OnlineDoctor) => {
+    setDoctors((prev) => {
+      const exists = prev.some((d) => d.id === doc.id);
+      if (exists) {
+        return prev.map((d) => (d.id === doc.id ? doc : d));
+      }
+      return [doc, ...prev];
+    });
+  };
+
+  const handleDeleteDoctor = (docId: string) => {
+    setDoctors((prev) => prev.filter((d) => d.id !== docId));
+  };
+
+  const handleToggleDoctorOnline = (docId: string) => {
+    setDoctors((prev) =>
+      prev.map((d) => (d.id === docId ? { ...d, isOnline: !d.isOnline } : d))
+    );
+  };
+
+  const handleUpdateDoctorPassword = (doctorId: string, newPassword: string) => {
+    setDoctors((prev) =>
+      prev.map((d) =>
+        d.id === doctorId
+          ? { ...d, password: newPassword, isPasswordChanged: true }
+          : d
+      )
+    );
+  };
+
+  const handleUpdatePatientPassword = (patientId: string, newPassword: string) => {
+    setPatients((prev) =>
+      prev.map((p) => (p.id === patientId ? { ...p, password: newPassword } : p))
+    );
+  };
+
+  const handleUpdateAdminPassword = (newPassword: string) => {
+    setSecuritySettings((prev) => ({ ...prev, adminPassword: newPassword }));
+  };
 
   // Sync to local storage
   useEffect(() => {
@@ -153,6 +256,14 @@ export default function App() {
   useEffect(() => {
     localStorage.setItem('afyalishe_announcements', JSON.stringify(announcements));
   }, [announcements]);
+
+  useEffect(() => {
+    localStorage.setItem('afyalishe_bp_logs', JSON.stringify(bloodPressureLogs));
+  }, [bloodPressureLogs]);
+
+  useEffect(() => {
+    localStorage.setItem('afyalishe_water_today', String(waterGlassesToday));
+  }, [waterGlassesToday]);
 
   useEffect(() => {
     localStorage.setItem('afyalishe_security_settings', JSON.stringify(securitySettings));
@@ -266,6 +377,23 @@ export default function App() {
     );
   };
 
+  const handleDeletePatient = (patientId: string) => {
+    setPatients((prev) => prev.filter((p) => p.id !== patientId));
+    if (selectedPatientId === patientId) {
+      const remaining = patients.filter((p) => p.id !== patientId);
+      if (remaining.length > 0) {
+        setSelectedPatientId(remaining[0].id);
+      }
+    }
+  };
+
+  const handleSelectActivePatientById = (patId: string) => {
+    const p = patients.find((pat) => pat.id === patId);
+    if (p) {
+      handleSelectActivePatientForView(p);
+    }
+  };
+
   const handleSelectActivePatientForView = (patient: RegisteredPatient) => {
     setSelectedPatientId(patient.id);
     // Sync patient info to current active profile view
@@ -280,8 +408,49 @@ export default function App() {
       medicationInfo: patient.currentMedications || prev.medicationInfo,
     }));
     setPortalMode('patient');
-    setActiveTab('dashboard');
+
+    // Automatically navigate to the specific dashboard of the condition they are registered for
+    if (patient.category === 'shinikizo_la_damu') {
+      setActiveTab('blood_pressure');
+    } else if (patient.category === 'kupunguza_uzito') {
+      setActiveTab('weight_loss');
+    } else if (patient.category === 'watoto_lishe') {
+      setActiveTab('pediatric');
+    } else if (patient.category === 'lishe_jumla') {
+      setActiveTab('general_nutrition');
+    } else {
+      setActiveTab('dashboard');
+    }
   };
+
+  // Enforce disease-specific dashboard restriction when in patient portal
+  useEffect(() => {
+    if (portalMode === 'patient') {
+      const activePat = patients.find((p) => p.id === selectedPatientId) || patients[0];
+      if (activePat) {
+        const cat = activePat.category;
+        const allowedTabsMap: Record<ClientCategory, NavTabType[]> = {
+          kisukari: ['dashboard', 'glucose', 'recommendations', 'food_plate', 'online_doctors', 'chat'],
+          shinikizo_la_damu: ['blood_pressure', 'food_plate', 'online_doctors', 'chat'],
+          kupunguza_uzito: ['weight_loss', 'bmi', 'food_plate', 'online_doctors', 'chat'],
+          watoto_lishe: ['pediatric', 'food_plate', 'online_doctors', 'chat'],
+          lishe_jumla: ['general_nutrition', 'food_plate', 'online_doctors', 'chat'],
+        };
+
+        const allowed = allowedTabsMap[cat] || ['dashboard', 'food_plate', 'online_doctors', 'chat'];
+        if (!allowed.includes(activeTab)) {
+          const defaultTabMap: Record<ClientCategory, NavTabType> = {
+            kisukari: 'dashboard',
+            shinikizo_la_damu: 'blood_pressure',
+            kupunguza_uzito: 'weight_loss',
+            watoto_lishe: 'pediatric',
+            lishe_jumla: 'general_nutrition',
+          };
+          setActiveTab(defaultTabMap[cat] || 'dashboard');
+        }
+      }
+    }
+  }, [portalMode, selectedPatientId, patients, activeTab]);
 
   const handleUpdatePatientWeight = (weightKg: number, notes?: string) => {
     const currentPat = patients.find(p => p.id === selectedPatientId) || patients[0];
@@ -305,13 +474,27 @@ export default function App() {
     setProfile((prev) => ({ ...prev, weightKg }));
   };
 
+  const handleSaveBpLog = (newLog: BloodPressureLog) => {
+    setBloodPressureLogs((prev) => [newLog, ...prev]);
+  };
+
+  const handleDeleteBpLog = (id: string) => {
+    setBloodPressureLogs((prev) => prev.filter((l) => l.id !== id));
+  };
+
+  const handleLogWaterGlass = (amount: number) => {
+    setWaterGlassesToday((prev) => Math.max(0, prev + amount));
+  };
+
   const selectedPatient = patients.find((p) => p.id === selectedPatientId) || patients[0];
   const latestGlucose = glucoseLogs.length > 0 ? glucoseLogs[glucoseLogs.length - 1] : undefined;
 
   // Auth & Security Handlers
   const handleLoginSuccess = (session: AuthSession) => {
     setAuthSession(session);
+    localStorage.setItem('afyalishe_auth_session', JSON.stringify(session));
     setIsAuthModalOpen(false);
+    setSystemLockNotice(null);
 
     if (session.role === 'patient' && session.patientId) {
       const patient = patients.find((p) => p.id === session.patientId);
@@ -320,6 +503,9 @@ export default function App() {
       }
       setPortalMode('patient');
       setActiveTab('dashboard');
+    } else if (session.role === 'practitioner') {
+      setPortalMode('nutritionist');
+      setActiveTab('nutritionist');
     } else if (session.role === 'admin') {
       setPortalMode('nutritionist');
       setActiveTab('nutritionist');
@@ -329,6 +515,19 @@ export default function App() {
   const handleLogout = () => {
     setAuthSession(null);
     localStorage.removeItem('afyalishe_auth_session');
+    setIsAuthModalOpen(false);
+    setSystemLockNotice('Mfumo umefungwa salama. Weka nenosiri lako la mtumiaji kufungua tena mfumo.');
+  };
+
+  const handleToggleRequireLoginFirst = () => {
+    setSecuritySettings((prev) => {
+      const updated = {
+        ...prev,
+        requireLoginFirst: !prev.requireLoginFirst,
+      };
+      localStorage.setItem('afyalishe_security_settings', JSON.stringify(updated));
+      return updated;
+    });
   };
 
   const handleOpenAuthModal = (role?: UserRole) => {
@@ -336,8 +535,48 @@ export default function App() {
     setIsAuthModalOpen(true);
   };
 
+  const activeTheme = DASHBOARD_THEMES[currentTheme] || DASHBOARD_THEMES.emerald;
+
+  // STRICT MANDATORY ROLE AUTHENTICATION GATE
+  // If user is not authenticated with a valid role password, the dashboard CANNOT be accessed!
+  if (!authSession) {
+    return (
+      <div className={`min-h-screen ${activeTheme.pageBg} flex flex-col justify-center items-center p-4 sm:p-6 transition-colors duration-200 font-sans selection:bg-emerald-500 selection:text-white`}>
+        <AuthGateView
+          patients={patients}
+          doctors={doctors}
+          securitySettings={securitySettings}
+          onLoginSuccess={handleLoginSuccess}
+          currentTheme={currentTheme}
+          onOpenThemeModal={() => setIsThemeModalOpen(true)}
+          onUpdatePatientPassword={handleUpdatePatientPassword}
+          onUpdateDoctorPassword={handleUpdateDoctorPassword}
+          onUpdateAdminPassword={handleUpdateAdminPassword}
+          lockedNotice={systemLockNotice}
+          onOpenInstallerModal={() => setIsInstallerModalOpen(true)}
+        />
+
+        {/* Theme Switcher Modal Accessible on Gate */}
+        <ThemeSwitcherModal
+          isOpen={isThemeModalOpen}
+          onClose={() => setIsThemeModalOpen(false)}
+          currentTheme={currentTheme}
+          onSelectTheme={handleSelectTheme}
+        />
+
+        {/* PWA App Installer Modal Accessible from Gate */}
+        <AppInstallerModal
+          isOpen={isInstallerModalOpen}
+          onClose={() => setIsInstallerModalOpen(false)}
+          userRole="practitioner"
+          userName="Mtumiaji wa Kliniki"
+        />
+      </div>
+    );
+  }
+
   return (
-    <div className="min-h-screen bg-slate-100/70 text-slate-800 flex flex-col font-sans selection:bg-emerald-500 selection:text-white">
+    <div className={`min-h-screen ${activeTheme.pageBg} flex flex-col font-sans transition-colors duration-200 selection:bg-emerald-500 selection:text-white`}>
       {/* Top Navbar */}
       <Navbar
         activeTab={activeTab}
@@ -355,9 +594,15 @@ export default function App() {
           setIsRegisterModalOpen(true);
         }}
         registeredPatientsCount={patients.length}
+        selectedPatient={selectedPatient}
+        patients={patients}
+        onSelectPatientId={handleSelectActivePatientById}
+        onOpenAdminDoctorModal={() => setIsAdminPractitionersModalOpen(true)}
         onOpenScanner={() => setIsScannerOpen(true)}
         onOpenGlucoseModal={() => setIsGlucoseModalOpen(true)}
         onOpenProfile={() => setIsProfileModalOpen(true)}
+        onOpenPrintEatingPlan={() => setIsOfflinePlanModalOpen(true)}
+        onOpenRemindersModal={() => setIsRemindersModalOpen(true)}
         latestGlucose={latestGlucose}
         profile={profile}
         announcementsCount={announcements.length}
@@ -371,6 +616,12 @@ export default function App() {
             allowPatientPrinting: !prev.allowPatientPrinting,
           }));
         }}
+        onOpenGitHubModal={() => setIsGitHubModalOpen(true)}
+        onToggleRequireLoginFirst={handleToggleRequireLoginFirst}
+        currentTheme={currentTheme}
+        onOpenThemeModal={() => setIsThemeModalOpen(true)}
+        onOpenInstallerModal={() => setIsInstallerModalOpen(true)}
+        onOpenSecuritySettings={() => setIsSecuritySettingsModalOpen(true)}
       />
 
       {/* Main Content Area */}
@@ -385,9 +636,15 @@ export default function App() {
               setIsRegisterModalOpen(true);
             }}
             onUpdatePatient={handleUpdatePatient}
+            onDeletePatient={handleDeletePatient}
             onSelectActivePatientForView={handleSelectActivePatientForView}
             securitySettings={securitySettings}
             onUpdateSecuritySettings={setSecuritySettings}
+            glucoseLogs={glucoseLogs}
+            mealLogs={meals}
+            onOpenAdminPractitionersModal={() => setIsAdminPractitionersModalOpen(true)}
+            onOpenInstallerModal={() => setIsInstallerModalOpen(true)}
+            onOpenSecuritySettings={() => setIsSecuritySettingsModalOpen(true)}
             onOpenPrintReport={(glucoseVal) => {
               const fakeLog: GlucoseLog = {
                 id: 'report-' + Date.now(),
@@ -412,6 +669,19 @@ export default function App() {
           />
         )}
 
+        {/* Kliniki ya Lishe ya Watoto (Pediatric Nutrition Clinic) */}
+        {activeTab === 'pediatric' && (
+          <ChildNutritionTrackerView
+            patient={
+              patients.find((p) => p.id === selectedPatientId && p.category === 'watoto_lishe') ||
+              patients.find((p) => p.category === 'watoto_lishe') ||
+              selectedPatient ||
+              patients[0]
+            }
+            onUpdatePatient={handleUpdatePatient}
+          />
+        )}
+
         {/* Ushauri wa Kilishe kwa Ujumla (General Nutrition Guide) */}
         {activeTab === 'general_nutrition' && (
           <GeneralNutritionGuideView />
@@ -427,6 +697,11 @@ export default function App() {
             onOpenGlucoseModal={() => setIsGlucoseModalOpen(true)}
             onSelectTab={(tab) => setActiveTab(tab)}
             onDeleteMeal={handleDeleteMeal}
+            onOpenDriveModal={() => setIsDriveModalOpen(true)}
+            onOpenGitHubModal={() => setIsGitHubModalOpen(true)}
+            currentTheme={currentTheme}
+            onOpenThemeModal={() => setIsThemeModalOpen(true)}
+            authSession={authSession}
           />
         )}
 
@@ -483,9 +758,62 @@ export default function App() {
             recentMeals={meals}
           />
         )}
+
+        {/* Kliniki ya Shinikizo la Damu (Presha - Hypertension Clinic) */}
+        {activeTab === 'blood_pressure' && (
+          <BloodPressureClinicView
+            profile={profile}
+            onUpdateProfile={setProfile}
+            logs={bloodPressureLogs}
+            onSaveLog={handleSaveBpLog}
+            onDeleteLog={handleDeleteBpLog}
+            activePatient={selectedPatient}
+            onOpenDoctorConsultation={() => setActiveTab('online_doctors')}
+            onOpenChatConsultation={() => setActiveTab('online_doctors')}
+            onOpenPrintPlan={() => setIsOfflinePlanModalOpen(true)}
+          />
+        )}
+
+        {/* Mwongozo wa Chakula & Sahani ya TFNC (Food Plate Guide) */}
+        {activeTab === 'food_plate' && (
+          <FoodPlateGuideView
+            onOpenPrintPlan={() => setIsOfflinePlanModalOpen(true)}
+            registeredCondition={selectedPatient?.category}
+            activePatientName={selectedPatient?.fullName}
+          />
+        )}
+
+        {/* Sehemu ya Kuwasiliana na Daktari Aliye Online & Karibu */}
+        {activeTab === 'online_doctors' && (
+          <NearbyOnlineDoctorView
+            profile={profile}
+            registeredPatients={patients}
+            onOpenRegisterModal={() => {
+              setRegisterInitialCategory('shinikizo_la_damu');
+              setIsRegisterModalOpen(true);
+            }}
+            onSwitchToPatient={handleSelectActivePatientForView}
+            doctors={doctors}
+            onSaveDoctor={handleSaveDoctor}
+            onDeleteDoctor={handleDeleteDoctor}
+            onToggleDoctorOnline={handleToggleDoctorOnline}
+            isAdmin={authSession?.role === 'admin'}
+            onOpenAdminModal={() => setIsAdminPractitionersModalOpen(true)}
+          />
+        )}
       </main>
 
       {/* Modals */}
+      <AdminPractitionersModal
+        isOpen={isAdminPractitionersModalOpen}
+        onClose={() => setIsAdminPractitionersModalOpen(false)}
+        doctors={doctors}
+        onSaveDoctor={handleSaveDoctor}
+        onDeleteDoctor={handleDeleteDoctor}
+        onToggleDoctorOnline={handleToggleDoctorOnline}
+        onOpenInstallerModal={() => setIsInstallerModalOpen(true)}
+      />
+
       <PatientRegistrationModal
         isOpen={isRegisterModalOpen}
         onClose={() => setIsRegisterModalOpen(false)}
@@ -542,13 +870,81 @@ export default function App() {
 
       {/* Authentication & User Switching Modal */}
       <AuthModal
-        isOpen={isAuthModalOpen}
-        onClose={() => setIsAuthModalOpen(false)}
+        isOpen={isAuthModalOpen || (!authSession && securitySettings.requireLoginFirst)}
+        onClose={() => {
+          if (!authSession && securitySettings.requireLoginFirst) return;
+          setIsAuthModalOpen(false);
+        }}
+        isMandatory={!authSession && securitySettings.requireLoginFirst}
         patients={patients}
+        doctors={doctors}
         securitySettings={securitySettings}
         currentSession={authSession}
-        onLoginSuccess={handleLoginSuccess}
+        onLoginSuccess={(session) => {
+          handleLoginSuccess(session);
+          setIsAuthModalOpen(false);
+        }}
         initialRole={authModalRole}
+        onUpdatePatientPassword={handleUpdatePatientPassword}
+        onUpdateDoctorPassword={handleUpdateDoctorPassword}
+        onUpdateAdminPassword={handleUpdateAdminPassword}
+      />
+
+      {/* Theme Switcher Modal */}
+      <ThemeSwitcherModal
+        isOpen={isThemeModalOpen}
+        onClose={() => setIsThemeModalOpen(false)}
+        currentTheme={currentTheme}
+        onSelectTheme={handleSelectTheme}
+      />
+
+      {/* GitHub Sync Modal */}
+      <GitHubSyncModal
+        isOpen={isGitHubModalOpen}
+        onClose={() => setIsGitHubModalOpen(false)}
+      />
+
+      {/* Google Drive Integration Modal */}
+      <GoogleDriveModal
+        isOpen={isDriveModalOpen}
+        onClose={() => setIsDriveModalOpen(false)}
+        profile={profile}
+        meals={meals}
+        glucoseLogs={glucoseLogs}
+      />
+
+      {/* Offline Printable / Downloadable Eating Plan Modal */}
+      <OfflinePrintableEatingPlanModal
+        isOpen={isOfflinePlanModalOpen}
+        onClose={() => setIsOfflinePlanModalOpen(false)}
+        currentProfile={profile}
+        registeredPatients={patients}
+      />
+
+      {/* Meal Timing & Hydration Reminders Modal */}
+      <MealAndWaterReminderModal
+        isOpen={isRemindersModalOpen}
+        onClose={() => setIsRemindersModalOpen(false)}
+        profile={profile}
+        onUpdateProfile={setProfile}
+        waterGlassesToday={waterGlassesToday}
+        onLogWaterGlass={handleLogWaterGlass}
+      />
+
+      {/* PWA App Installer Modal for Admin / Practitioner */}
+      <AppInstallerModal
+        isOpen={isInstallerModalOpen}
+        onClose={() => setIsInstallerModalOpen(false)}
+        userRole={authSession?.role || 'practitioner'}
+        userName={authSession?.name}
+      />
+
+      {/* Clinical & Academic Security Governance Modal */}
+      <ClinicalSecuritySettingsModal
+        isOpen={isSecuritySettingsModalOpen}
+        onClose={() => setIsSecuritySettingsModalOpen(false)}
+        securitySettings={securitySettings}
+        onUpdateSecuritySettings={(updated) => setSecuritySettings(updated)}
       />
 
 

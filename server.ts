@@ -1,8 +1,12 @@
 import express from 'express';
 import path from 'path';
 import dotenv from 'dotenv';
+import { exec } from 'child_process';
+import { promisify } from 'util';
 import { GoogleGenAI, Type } from '@google/genai';
 import { createServer as createViteServer } from 'vite';
+
+const execAsync = promisify(exec);
 
 dotenv.config();
 
@@ -87,7 +91,7 @@ Kokotoa wanga kwa usahihi kwa kila sehemu kwenye sahani na jumla ya sahani nzima
     contentsPayload.push({ text: promptText });
 
     const response = await ai.models.generateContent({
-      model: 'gemini-3.7-flash',
+      model: 'gemini-3.8-flash',
       contents: { parts: contentsPayload },
       config: {
         systemInstruction: systemPrompt,
@@ -206,7 +210,7 @@ Kama sukari iko juu (>180 mg/dL), pendekeza milo yenye wanga kidogo sana (low-ca
 Kama sukari iko kawaida (70-130 kabla ya kula au chini ya 180 baada ya kula), pendekeza milo yenye uwiano kamili wa wanga tata wenye GI ndogo.`;
 
     const response = await ai.models.generateContent({
-      model: 'gemini-3.7-flash',
+      model: 'gemini-3.8-flash',
       contents: prompt,
       config: {
         responseMimeType: 'application/json',
@@ -286,7 +290,7 @@ Miongozo yako:
 4. Jibu kwa ufupi, kwa pointi zinazoeleweka, na kwa heshima kubwa.`;
 
     const chat = ai.chats.create({
-      model: 'gemini-3.7-flash',
+      model: 'gemini-3.8-flash',
       config: {
         systemInstruction,
       },
@@ -342,7 +346,7 @@ Chambua hasa:
 4. Mwongozo wa mazoezi salama ya Cardio na kujenga misuli (Resistance training) yenye tahadhari kwa mwenye kisukari.`;
 
     const response = await ai.models.generateContent({
-      model: 'gemini-3.7-flash',
+      model: 'gemini-3.8-flash',
       contents: userPrompt,
       config: {
         systemInstruction: systemPrompt,
@@ -446,7 +450,7 @@ Hakikisha tangazo lina:
 6. Ushauri wa kitendo (Wito wa kuchukua hatua).`;
 
     const response = await ai.models.generateContent({
-      model: 'gemini-3.7-flash',
+      model: 'gemini-3.8-flash',
       contents: userPrompt,
       config: {
         systemInstruction: systemPrompt,
@@ -485,6 +489,234 @@ Hakikisha tangazo lina:
     console.error('Error generating announcement draft:', error);
     return res.status(500).json({
       error: 'Imeshindikana kuandaa tangazo: ' + (error.message || ''),
+    });
+  }
+});
+
+// 12. GitHub Repository Status
+app.get('/api/github/status', async (req, res) => {
+  try {
+    let branch = 'main';
+    try {
+      const { stdout } = await execAsync('git rev-parse --abbrev-ref HEAD');
+      branch = stdout.trim();
+    } catch {}
+
+    let status = '';
+    try {
+      const { stdout } = await execAsync('git status --porcelain');
+      status = stdout.trim();
+    } catch {}
+
+    let lastCommit = '';
+    try {
+      const { stdout } = await execAsync('git log -1 --pretty=format:"%h - %s (%cr)"');
+      lastCommit = stdout.trim();
+    } catch {
+      lastCommit = 'Hakuna commit iliyorekodiwa bado';
+    }
+
+    let remotes = '';
+    try {
+      const { stdout } = await execAsync('git remote -v');
+      remotes = stdout.trim();
+    } catch {}
+
+    return res.json({
+      success: true,
+      branch,
+      hasUncommittedChanges: status.length > 0,
+      changedFiles: status ? status.split('\n').map((s) => s.trim()) : [],
+      lastCommit,
+      remotes,
+    });
+  } catch (err: any) {
+    return res.status(500).json({ error: err.message || 'Hitilafu ya kupata hali ya Git' });
+  }
+});
+
+// 13. GitHub Commit & Push Endpoint
+app.post('/api/github/push', async (req, res) => {
+  try {
+    const { repoUrl, personalAccessToken, commitMessage, branch = 'main' } = req.body;
+    if (!repoUrl) {
+      return res.status(400).json({ error: 'Tafadhali weka anwani ya GitHub Repository URL (mfano: https://github.com/username/afyalishe.git)' });
+    }
+
+    // Configure user in git
+    await execAsync('git config user.name "AfyaLishe Developer"');
+    await execAsync('git config user.email "dismaspokela@gmail.com"');
+
+    // Stage all changes
+    await execAsync('git add .');
+
+    const msg = (commitMessage || 'Sasisho la AfyaLishe Mfumo wa Lishe na Sukari').replace(/"/g, '\\"');
+    try {
+      await execAsync(`git commit -m "${msg}"`);
+    } catch {
+      // Nothing new to commit is fine
+    }
+
+    // Format target push URL
+    let targetPushUrl = repoUrl.trim();
+    if (personalAccessToken && personalAccessToken.trim()) {
+      const token = personalAccessToken.trim();
+      targetPushUrl = targetPushUrl.replace(/^https:\/\/(.*@)?github\.com\//, `https://${token}@github.com/`);
+    }
+
+    // Configure remote origin
+    try {
+      await execAsync('git remote remove origin');
+    } catch {}
+    await execAsync(`git remote add origin ${targetPushUrl}`);
+
+    // Rename branch to desired branch
+    await execAsync(`git branch -M ${branch}`);
+
+    // Push to GitHub
+    const { stdout, stderr } = await execAsync(`git push -u origin ${branch}`);
+
+    return res.json({
+      success: true,
+      message: 'Imefanikiwa kuwasilisha (push) kwenye GitHub!',
+      output: stdout || stderr,
+    });
+  } catch (error: any) {
+    console.error('Git push error:', error);
+    return res.status(500).json({
+      error: 'Hitilafu ya kuwasilisha kwenye GitHub: ' + (error.message || 'Tafadhali hakikisha URL na Token viko sahihi.'),
+    });
+  }
+});
+
+// 14. Nutritionist AI Patient Clinical History & Glucose Analysis Endpoint
+app.post('/api/nutritionist/analyze-patient-history', async (req, res) => {
+  try {
+    const { patient, glucoseLogs = [], mealLogs = [], weightLogs = [] } = req.body;
+
+    if (!patient) {
+      return res.status(400).json({ error: 'Taarifa za mgonjwa zinahitajika kwa uchambuzi.' });
+    }
+
+    const ai = getGeminiClient();
+
+    const systemPrompt = `Wewe ni Daktari Bingwa wa Magonjwa ya Kimetaboliki, Tezi na Lishe ya Kliniki (Senior Consultant Clinical Endocrinologist, Pediatrician & Clinical Dietitian).
+Kazi yako ni kufanya uchambuzi wa kina na wa kitaalamu wa historia ya mgonjwa kulingana na vipimo vya sukari, uzito, rekodi za milo, na taarifa za watoto (kama ni mtoto).
+Toa uchambuzi kwa lugha fasaha ya Kiswahili ya kitaalamu, wazi, yenye pointi thabiti, na inayomsaidia Mtaalamu wa Lishe (Nutritionist) kufanya maamuzi sahihi ya kimatibabu.
+
+Hakikisha unazalisha JSON kulingana na muundo:
+1. overallHealthTrend: ('inaboreka' | 'thabiti' | 'inazidi_kushuka' | 'inahitaji_uangalizi_wa_haraka')
+2. executiveSummary: Aya fupi ya muhtasari wa hali ya sasa ya mgonjwa
+3. glucoseTrendAnalysis: Wastani wa sukari, mwenendo wa asubuhi (fasting), baada ya kula (post-meal), mikurupuko (spikes/drops) kama vile Dawn phenomenon au Somogyi, na mtawanyiko (glycemic variability).
+4. criticalAlerts: Tahadhari za dharura au viashiria vya hatari (mfano: sukari kushuka usiku, viashiria vya DKA, utapiamlo au uzito duni kwa mtoto, madhara ya figo/macho kama sukari haitadhibitiwa).
+5. clinicalDietaryRecommendations: Mapendekezo 4-6 maalum ya mlo na marekebisho ya wanga/protini/mafuta yanayozingatia mazingira ya Afrika Mashariki.
+6. suggestedActionItemsForNutritionist: Hatua 3-5 za vitendo kwa mtaalamu wa lishe.
+7. pediatricInsights: Maoni ya kina kama mgonjwa ni mtoto (kuhusu ulaji, kuchagua vyakula, ukuaji, au virutubisho).
+8. referralRecommendation: Kama mgonjwa anastahili kupewa RUFAA (referral) kwa daktari bingwa, idara ipi, na maelezo ya kimatibabu.`;
+
+    const userPrompt = `Fanya uchambuzi wa kliniki kwa mgonjwa huyu:
+- Jina: ${patient.fullName}
+- Umri: ${patient.age} miaka (${patient.age < 18 ? 'MTOTO / PEDIATRIC' : 'MTU MZIMA'})
+- Jinsia: ${patient.gender === 'male' ? 'Mwanaume' : 'Mwanamke'}
+- Kitengo: ${patient.category}
+- Aina ya Kisukari: ${patient.diabetesType || 'Hana kisukari kilichothibitishwa'}
+- Uzito: ${patient.currentWeightKg} kg (Awali: ${patient.initialWeightKg} kg, Lengo: ${patient.targetWeightKg} kg), Urefu: ${patient.heightCm} cm
+- Shinikizo la damu: ${patient.bloodPressure || 'Haijarekodiwa'}
+- Dawa anazotumia: ${patient.currentMedications || 'Hazijatajwa'}
+- Magonjwa mengine: ${patient.medicalConditions || 'Hakuna'}
+- Malengo makuu: ${patient.primaryGoal}
+
+HISTORIA YA VIPIMO VYA SUKARI (${glucoseLogs.length} rekodi):
+${glucoseLogs.slice(0, 15).map((g: any) => `- Tarehe: ${g.timestamp ? g.timestamp.split('T')[0] : ''}, Kipimo: ${g.value} ${g.unit || 'mg/dL'}, Wakati: ${g.timing}, Hali: ${g.status}`).join('\n') || 'Hakuna vipimo vya sukari vilivyorekodiwa.'}
+
+HISTORIA YA MILO (${mealLogs.length} rekodi):
+${mealLogs.slice(0, 10).map((m: any) => `- Milo: ${m.mealType}, Jina: ${m.title}, Wanga: ${m.totalCarbs}g, Fiber: ${m.fiber}g, Kalori: ${m.calories}kcal`).join('\n') || 'Hakuna milo iliyorekodiwa.'}
+
+HISTORIA YA UZITO (${weightLogs.length} rekodi):
+${weightLogs.slice(0, 8).map((w: any) => `- Tarehe: ${w.date}, Uzito: ${w.weightKg}kg, Maelezo: ${w.notes || '-'}`).join('\n') || 'Hakuna kumbukumbu za uzito.'}
+
+${patient.childProfile ? `TAARIFA ZA MTOTO NA ULAJI:
+- Mlezi: ${patient.childProfile.guardianName} (${patient.childProfile.guardianRelation}), Simu: ${patient.childProfile.guardianPhone}
+- Kunyonyesha: ${patient.childProfile.breastfeedingStatus}
+- Mzingo wa Mkono (MUAC): ${patient.childProfile.muacCm || 'Haujapimwa'} cm (${patient.childProfile.muacStatus || 'haijulikani'})
+- Changamoto za Ulaji: ${Array.isArray(patient.childProfile.feedingChallenges) ? patient.childProfile.feedingChallenges.join(', ') : 'Hakuna'}
+- Vyakula anavyopenda: ${Array.isArray(patient.childProfile.favoriteFoods) ? patient.childProfile.favoriteFoods.join(', ') : '-'}
+- Vyakula anavyokataa: ${Array.isArray(patient.childProfile.dislikedFoods) ? patient.childProfile.dislikedFoods.join(', ') : '-'}
+- Kumbukumbu za milo: ${patient.childProfile.feedingLogs?.slice(0, 5).map((l: any) => `${l.mealType}: ${l.foodItems} (${l.portionConsumed})`).join('; ') || 'Hakuna'}
+` : ''}
+
+Toa ripoti kamilifu ya JSON kulingana na muundo.`;
+
+    const response = await ai.models.generateContent({
+      model: 'gemini-3.8-flash',
+      contents: userPrompt,
+      config: {
+        systemInstruction: systemPrompt,
+        responseMimeType: 'application/json',
+        responseSchema: {
+          type: Type.OBJECT,
+          properties: {
+            patientName: { type: Type.STRING },
+            analyzedDate: { type: Type.STRING },
+            overallHealthTrend: { 
+              type: Type.STRING, 
+              enum: ['inaboreka', 'thabiti', 'inazidi_kushuka', 'inahitaji_uangalizi_wa_haraka'] 
+            },
+            executiveSummary: { type: Type.STRING },
+            glucoseTrendAnalysis: {
+              type: Type.OBJECT,
+              properties: {
+                averageGlucose: { type: Type.NUMBER },
+                fastingTrend: { type: Type.STRING },
+                postMealTrend: { type: Type.STRING },
+                spikesOrDropsPattern: { type: Type.STRING },
+                glycemicVariability: { type: Type.STRING },
+              },
+              required: ['averageGlucose', 'fastingTrend', 'postMealTrend', 'spikesOrDropsPattern', 'glycemicVariability'],
+            },
+            criticalAlerts: {
+              type: Type.ARRAY,
+              items: { type: Type.STRING },
+            },
+            clinicalDietaryRecommendations: {
+              type: Type.ARRAY,
+              items: { type: Type.STRING },
+            },
+            suggestedActionItemsForNutritionist: {
+              type: Type.ARRAY,
+              items: { type: Type.STRING },
+            },
+            pediatricInsights: { type: Type.STRING },
+            referralRecommendation: {
+              type: Type.OBJECT,
+              properties: {
+                isRecommended: { type: Type.BOOLEAN },
+                recommendedDepartment: { type: Type.STRING },
+                clinicalJustification: { type: Type.STRING },
+              },
+              required: ['isRecommended', 'recommendedDepartment', 'clinicalJustification'],
+            },
+          },
+          required: [
+            'patientName',
+            'analyzedDate',
+            'overallHealthTrend',
+            'executiveSummary',
+            'glucoseTrendAnalysis',
+            'criticalAlerts',
+            'clinicalDietaryRecommendations',
+            'suggestedActionItemsForNutritionist',
+          ],
+        },
+      },
+    });
+
+    const parsed = JSON.parse(response.text || '{}');
+    return res.json({ success: true, data: parsed });
+  } catch (error: any) {
+    console.error('Error analyzing patient clinical history:', error);
+    return res.status(500).json({
+      error: 'Hitilafu wakati wa kuchambua historia ya mgonjwa kwa AI: ' + (error.message || ''),
     });
   }
 });
