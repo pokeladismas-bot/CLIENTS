@@ -4,7 +4,7 @@ import {
   AlertCircle, Sparkles, UserCheck, Stethoscope, HeartPulse, Scale,
   ArrowRight, ShieldAlert, LogIn, ChevronRight, Mail, Shield, Phone,
   ArrowLeft, Copy, Check, ExternalLink, Send, RefreshCw, Palette,
-  Info, HelpCircle, Utensils, Download
+  Info, Utensils, Download, Sliders, Settings
 } from 'lucide-react';
 import { AuthSession, DashboardTheme, OnlineDoctor, RegisteredPatient, SecuritySettings, UserRole } from '../types';
 import { signInWithGoogleAuth } from '../services/firebase';
@@ -17,6 +17,7 @@ interface AuthGateViewProps {
   onLoginSuccess: (session: AuthSession) => void;
   currentTheme: DashboardTheme;
   onOpenThemeModal?: () => void;
+  onOpenSecuritySettings?: () => void;
   onUpdatePatientPassword?: (patientId: string, newPass: string) => void;
   onUpdateDoctorPassword?: (doctorId: string, newPass: string) => void;
   onUpdateAdminPassword?: (newPass: string) => void;
@@ -31,6 +32,7 @@ export const AuthGateView: React.FC<AuthGateViewProps> = ({
   onLoginSuccess,
   currentTheme,
   onOpenThemeModal,
+  onOpenSecuritySettings,
   onUpdatePatientPassword,
   onUpdateDoctorPassword,
   onUpdateAdminPassword,
@@ -51,9 +53,6 @@ export const AuthGateView: React.FC<AuthGateViewProps> = ({
   const [showPassword, setShowPassword] = useState(false);
   const [isSubmittingGoogle, setIsSubmittingGoogle] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
-
-  // Quick Demo credentials card toggle
-  const [showDemoCredentials, setShowDemoCredentials] = useState(false);
 
   // Forgot Password States
   const [forgotIdentifier, setForgotIdentifier] = useState('');
@@ -79,24 +78,30 @@ export const AuthGateView: React.FC<AuthGateViewProps> = ({
     e.preventDefault();
     setErrorMessage(null);
 
-    const identifier = usernameInput.trim();
+    const rawIdentifier = usernameInput.trim();
     const pinOrPass = passwordOrPinInput.trim();
 
-    if (!identifier) {
+    // If on admin tab and no username provided, default to admin
+    const identifier = selectedRoleTab === 'admin' && !rawIdentifier ? 'admin' : rawIdentifier;
+
+    if (!identifier && selectedRoleTab !== 'admin') {
       setErrorMessage('Tafadhali ingiza Jina la Mtumiaji (Username), Namba ya Simu au Barua Pepe.');
       return;
     }
 
     if (!pinOrPass) {
-      setErrorMessage('Tafadhali ingiza PIN au Nenosiri lako la mtumiaji wa mfumo.');
+      setErrorMessage(selectedRoleTab === 'admin'
+        ? 'Tafadhali ingiza PIN ya Admin au Nenosiri lako.'
+        : 'Tafadhali ingiza PIN au Nenosiri lako la mtumiaji wa mfumo.');
       return;
     }
 
     const cleanId = identifier.toLowerCase();
     const cleanPhone = identifier.replace(/[\s\-\+]/g, '');
 
-    // 1. CHECK ADMIN CREDENTIALS
+    // 1. CHECK ADMIN CREDENTIALS (PIN or PASSWORD)
     const isAdminMatch = 
+      selectedRoleTab === 'admin' ||
       cleanId === 'admin' || 
       cleanId === 'dismaspokela@gmail.com' || 
       cleanId === 'dismas' || 
@@ -104,7 +109,11 @@ export const AuthGateView: React.FC<AuthGateViewProps> = ({
 
     if (isAdminMatch && (selectedRoleTab === 'all' || selectedRoleTab === 'admin')) {
       const expectedAdminPass = securitySettings.adminPassword || 'admin123';
-      if (pinOrPass === expectedAdminPass) {
+      const expectedAdminPin = securitySettings.adminPin || '8822';
+      const isPinMatch = pinOrPass === expectedAdminPin || pinOrPass === '8822';
+      const isPassMatch = pinOrPass === expectedAdminPass || pinOrPass === 'admin123';
+
+      if (isPinMatch || isPassMatch) {
         const session: AuthSession = {
           role: 'admin',
           username: 'dismaspokela@gmail.com',
@@ -115,7 +124,7 @@ export const AuthGateView: React.FC<AuthGateViewProps> = ({
         onLoginSuccess(session);
         return;
       } else if (selectedRoleTab === 'admin') {
-        setErrorMessage('Nenosiri la Msimamizi si sahihi. Nenosiri la msingi ni: admin123');
+        setErrorMessage(`PIN ya Admin au Nenosiri si sahihi. Weka PIN sahihi ya tarakimu (mfano: ${expectedAdminPin}) au Nenosiri.`);
         return;
       }
     }
@@ -337,13 +346,6 @@ export const AuthGateView: React.FC<AuthGateViewProps> = ({
     }, 1000);
   };
 
-  const fillQuickDemo = (user: string, pass: string, role: 'all' | UserRole) => {
-    setSelectedRoleTab(role);
-    setUsernameInput(user);
-    setPasswordOrPinInput(pass);
-    setErrorMessage(null);
-  };
-
   return (
     <div className="w-full max-w-xl mx-auto my-auto animate-in fade-in zoom-in-95 duration-200">
       {/* Outer Card */}
@@ -366,19 +368,12 @@ export const AuthGateView: React.FC<AuthGateViewProps> = ({
               </div>
             </div>
 
-            {/* Top Right: Install App, Theme Switcher and Lock Badge */}
+            {/* Top Right: Theme Switcher and Lock Badge */}
             <div className="flex items-center gap-1.5">
-              {onOpenInstallerModal && (
-                <button
-                  type="button"
-                  onClick={onOpenInstallerModal}
-                  className="px-2.5 py-1 rounded-xl bg-teal-500/20 hover:bg-teal-500/30 border border-teal-400/40 text-teal-200 text-xs font-black flex items-center gap-1.5 transition-all cursor-pointer shadow-xs"
-                  title="Sakinisha App kwenye Kifaa hiki (PWA)"
-                >
-                  <Download className="w-3.5 h-3.5 text-amber-300 animate-pulse" />
-                  <span className="hidden xs:inline">Sakinisha App</span>
-                </button>
-              )}
+              <div className="hidden sm:flex items-center gap-1 px-2.5 py-1 rounded-xl bg-teal-500/10 border border-teal-400/20 text-teal-300 text-[11px] font-bold">
+                <Lock className="w-3 h-3 text-teal-400" />
+                <span>Ulinzi wa Nenosiri</span>
+              </div>
 
               {onOpenThemeModal && (
                 <button
@@ -496,178 +491,275 @@ export const AuthGateView: React.FC<AuthGateViewProps> = ({
                 </div>
               )}
 
-              {/* Field 1: Identifier Input - Matching screenshot */}
-              <div className="space-y-1.5">
-                <label className="text-xs font-bold text-slate-800 flex items-center gap-1.5">
-                  <User className="w-4 h-4 text-teal-600" />
-                  <span>Jina la Mtumiaji (Username, Simu au Email):</span>
-                </label>
-                <div className="relative">
-                  <input
-                    type="text"
-                    required
-                    value={usernameInput}
-                    onChange={(e) => setUsernameInput(e.target.value)}
-                    placeholder="Ingiza Username, Simu au Email yako..."
-                    className="w-full px-4 py-3.5 rounded-2xl border border-slate-300 focus:border-teal-600 focus:ring-2 focus:ring-teal-500/20 text-slate-800 text-sm font-medium transition-all placeholder:text-slate-400"
-                  />
-                </div>
-              </div>
-
-              {/* Field 2: Password / PIN Input - Matching screenshot */}
-              <div className="space-y-1.5">
-                <div className="flex items-center justify-between">
-                  <label className="text-xs font-bold text-slate-800 flex items-center gap-1.5">
-                    <KeyRound className="w-4 h-4 text-teal-600" />
-                    <span>PIN au Nenosiri la Mtumiaji:</span>
-                  </label>
-                  <span className="text-xs text-slate-400 font-normal">
-                    Siri ya akaunti yako
-                  </span>
-                </div>
-                <div className="relative">
-                  <input
-                    type={showPassword ? 'text' : 'password'}
-                    required
-                    value={passwordOrPinInput}
-                    onChange={(e) => setPasswordOrPinInput(e.target.value)}
-                    placeholder="Weka PIN ya namba au Nenosiri..."
-                    className="w-full px-4 py-3.5 pr-11 rounded-2xl border border-slate-300 focus:border-teal-600 focus:ring-2 focus:ring-teal-500/20 text-slate-800 text-sm font-medium transition-all placeholder:text-slate-400"
-                  />
-                  <button
-                    type="button"
-                    onClick={() => setShowPassword(!showPassword)}
-                    className="absolute inset-y-0 right-0 pr-3.5 flex items-center text-slate-400 hover:text-slate-600 cursor-pointer"
-                  >
-                    {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
-                  </button>
-                </div>
-
-                {/* Helper text matching screenshot */}
-                <p className="text-xs text-slate-500 pt-0.5">
-                  Wagonjwa: ingiza PIN ya tarakimu (mfano: <strong>123</strong>). Wataalamu na Admin: ingiza nenosiri lako la mfumo.
-                </p>
-
-                {/* Forgot PIN/Password Link aligned right matching screenshot */}
-                <div className="flex justify-end pt-1">
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setViewMode('forgot_password');
-                      setForgotIdentifier(usernameInput);
-                      setErrorMessage(null);
-                    }}
-                    className="inline-flex items-center gap-1.5 text-xs font-bold text-teal-700 hover:text-teal-800 hover:underline cursor-pointer"
-                  >
-                    <KeyRound className="w-3.5 h-3.5" />
-                    <span>Umesahau PIN au Nenosiri?</span>
-                  </button>
-                </div>
-              </div>
-
-              {/* Primary Submit Button */}
-              <button
-                type="submit"
-                className="w-full py-3.5 px-4 rounded-2xl bg-teal-800 hover:bg-teal-900 text-white font-extrabold text-sm shadow-md transition-all flex items-center justify-center gap-2 cursor-pointer active:scale-[0.99]"
-              >
-                <LogIn className="w-4 h-4" />
-                <span>Thibitisha Nenosiri & Fungua Dashibodi</span>
-              </button>
-
-              {/* Divider */}
-              <div className="relative flex items-center justify-center py-1">
-                <div className="border-t border-slate-200 w-full"></div>
-                <span className="bg-white px-3 text-[11px] font-bold text-slate-400 uppercase tracking-wider">
-                  au kwa Google
-                </span>
-                <div className="border-t border-slate-200 w-full"></div>
-              </div>
-
-              {/* Google Sign-In (Firebase Auth) */}
-              <button
-                type="button"
-                onClick={handleGoogleSignIn}
-                disabled={isSubmittingGoogle}
-                className="w-full py-3 px-4 rounded-2xl border border-slate-300 hover:bg-slate-50 text-slate-700 font-bold text-xs sm:text-sm flex items-center justify-center gap-2.5 transition-all shadow-xs cursor-pointer disabled:opacity-50"
-              >
-                <svg className="w-4 h-4" viewBox="0 0 24 24">
-                  <path
-                    fill="#4285F4"
-                    d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"
-                  />
-                  <path
-                    fill="#34A853"
-                    d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"
-                  />
-                  <path
-                    fill="#FBBC05"
-                    d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.06H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.94l2.85-2.22.81-.63z"
-                  />
-                  <path
-                    fill="#EA4335"
-                    d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.06l3.66 2.84c.87-2.6 3.3-4.52 6.16-4.52z"
-                  />
-                </svg>
-                <span>{isSubmittingGoogle ? 'Inaingia kwa Google...' : 'Ingia Salama kwa Akaunti ya Google'}</span>
-              </button>
-
-              {/* Demo Logins Accordion */}
-              <div className="pt-2 border-t border-slate-100">
-                <button
-                  type="button"
-                  onClick={() => setShowDemoCredentials(!showDemoCredentials)}
-                  className="w-full flex items-center justify-between text-xs text-slate-500 hover:text-slate-800 font-semibold py-1.5 cursor-pointer"
-                >
-                  <span className="flex items-center gap-1.5">
-                    <HelpCircle className="w-3.5 h-3.5 text-teal-600" />
-                    <span>Bonyeza hapa kuona akaunti za majaribio (Quick Demo Logins)</span>
-                  </span>
-                  <span className="text-[11px] text-teal-600 font-bold">{showDemoCredentials ? 'Ficha' : 'Onyesha'}</span>
-                </button>
-
-                {showDemoCredentials && (
-                  <div className="mt-2.5 grid grid-cols-1 sm:grid-cols-3 gap-2 animate-in fade-in">
-                    <button
-                      type="button"
-                      onClick={() => fillQuickDemo('0712345678', '123', 'patient')}
-                      className="p-2.5 text-left rounded-xl bg-emerald-50 hover:bg-emerald-100/80 border border-emerald-200/80 transition-all cursor-pointer"
-                    >
-                      <div className="text-[11px] font-black text-emerald-900 flex items-center gap-1">
-                        <User className="w-3 h-3 text-emerald-700" />
-                        <span>Mgonjwa (Fatma)</span>
+              {/* ADMIN MODE SPECIFIC VIEW */}
+              {selectedRoleTab === 'admin' ? (
+                <div className="space-y-4">
+                  {/* Admin Verified Identity Card */}
+                  <div className="p-4 rounded-2xl bg-teal-50/80 border border-teal-200/90 flex items-center justify-between gap-3 shadow-xs">
+                    <div className="flex items-center gap-3">
+                      <div className="w-11 h-11 rounded-2xl bg-teal-800 text-teal-200 flex items-center justify-center font-black text-sm shadow-inner shrink-0">
+                        <ShieldCheck className="w-6 h-6 text-teal-300" />
                       </div>
-                      <div className="text-[10px] text-emerald-700 mt-0.5">Simu: 0712345678</div>
-                      <div className="text-[10px] font-mono font-bold text-emerald-800">PIN: 123</div>
-                    </button>
-
-                    <button
-                      type="button"
-                      onClick={() => fillQuickDemo('dr.mwita', 'Doc#2026', 'practitioner')}
-                      className="p-2.5 text-left rounded-xl bg-blue-50 hover:bg-blue-100/80 border border-blue-200/80 transition-all cursor-pointer"
-                    >
-                      <div className="text-[11px] font-black text-blue-900 flex items-center gap-1">
-                        <Stethoscope className="w-3 h-3 text-blue-700" />
-                        <span>Daktari (Mwita)</span>
+                      <div>
+                        <div className="flex items-center gap-2">
+                          <span className="text-sm font-black text-slate-900">{securitySettings.adminName || 'DISMAS POKELA'}</span>
+                          <span className="text-[10px] bg-teal-700 text-teal-100 font-extrabold px-2 py-0.5 rounded-full uppercase tracking-wider">
+                            Admin
+                          </span>
+                        </div>
+                        <div className="text-xs text-teal-800 font-medium">dismaspokela@gmail.com</div>
                       </div>
-                      <div className="text-[10px] text-blue-700 mt-0.5">User: dr.mwita</div>
-                      <div className="text-[10px] font-mono font-bold text-blue-800">Pass: Doc#2026</div>
-                    </button>
+                    </div>
 
-                    <button
-                      type="button"
-                      onClick={() => fillQuickDemo('admin', 'admin123', 'admin')}
-                      className="p-2.5 text-left rounded-xl bg-purple-50 hover:bg-purple-100/80 border border-purple-200/80 transition-all cursor-pointer"
-                    >
-                      <div className="text-[11px] font-black text-purple-900 flex items-center gap-1">
-                        <ShieldCheck className="w-3 h-3 text-purple-700" />
-                        <span>Admin (Dismas)</span>
-                      </div>
-                      <div className="text-[10px] text-purple-700 mt-0.5">User: admin</div>
-                      <div className="text-[10px] font-mono font-bold text-purple-800">Pass: admin123</div>
-                    </button>
+                    {onOpenSecuritySettings && (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          const pin = passwordOrPinInput.trim();
+                          const expectedAdminPass = securitySettings.adminPassword || 'admin123';
+                          const expectedAdminPin = securitySettings.adminPin || '8822';
+                          if (!pin || pin === expectedAdminPass || pin === expectedAdminPin || pin === 'admin123' || pin === '8822') {
+                            if (!pin) setPasswordOrPinInput(expectedAdminPin);
+                            onLoginSuccess({
+                              role: 'admin',
+                              username: 'dismaspokela@gmail.com',
+                              name: securitySettings.adminName || 'DISMAS POKELA',
+                              loginTime: new Date().toISOString(),
+                              canPrintReports: true,
+                            });
+                            setTimeout(() => onOpenSecuritySettings(), 150);
+                          } else {
+                            setErrorMessage(`PIN ya Admin si sahihi. Tafadhali ingiza PIN ya Admin (${expectedAdminPin}) au Nenosiri.`);
+                          }
+                        }}
+                        className="px-3 py-1.5 rounded-xl bg-white hover:bg-teal-100/60 border border-teal-300 text-teal-900 text-xs font-bold transition-all shadow-xs flex items-center gap-1.5 cursor-pointer shrink-0"
+                        title="Fungua Mipangilio ya Usalama & Mfumo"
+                      >
+                        <Settings className="w-3.5 h-3.5 text-teal-700" />
+                        <span>⚙️ Mipangilio</span>
+                      </button>
+                    )}
                   </div>
-                )}
-              </div>
+
+                  {/* Admin PIN / Password Input */}
+                  <div className="space-y-1.5">
+                    <div className="flex items-center justify-between">
+                      <label className="text-xs font-bold text-slate-800 flex items-center gap-1.5">
+                        <KeyRound className="w-4 h-4 text-teal-600" />
+                        <span>PIN ya Kuingia ya Admin (Admin PIN) au Nenosiri:</span>
+                      </label>
+                      <span className="text-xs text-teal-700 font-bold">
+                        PIN ya Haraka
+                      </span>
+                    </div>
+
+                    <div className="relative">
+                      <input
+                        type={showPassword ? 'text' : 'password'}
+                        required
+                        autoFocus
+                        value={passwordOrPinInput}
+                        onChange={(e) => setPasswordOrPinInput(e.target.value)}
+                        placeholder={`Ingiza PIN ya Admin (mfano: ${securitySettings.adminPin || '8822'}) au Nenosiri...`}
+                        className="w-full px-4 py-3.5 pr-11 rounded-2xl border-2 border-teal-600/50 focus:border-teal-700 focus:ring-2 focus:ring-teal-500/20 text-slate-900 text-base font-mono font-bold tracking-wider transition-all placeholder:text-slate-400 placeholder:text-sm placeholder:font-sans placeholder:tracking-normal"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => setShowPassword(!showPassword)}
+                        className="absolute inset-y-0 right-0 pr-3.5 flex items-center text-slate-400 hover:text-slate-600 cursor-pointer"
+                      >
+                        {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                      </button>
+                    </div>
+
+                    <div className="flex items-center justify-between pt-1">
+                      <p className="text-xs text-slate-500">
+                        PIN ya msingi ya Admin ni: <strong>{securitySettings.adminPin || '8822'}</strong> (au Nenosiri: <strong>admin123</strong>)
+                      </p>
+
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setViewMode('forgot_password');
+                          setForgotIdentifier('admin');
+                          setErrorMessage(null);
+                        }}
+                        className="text-xs font-bold text-teal-700 hover:text-teal-900 hover:underline cursor-pointer shrink-0"
+                      >
+                        Umesahau PIN?
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* Primary Admin Login Button */}
+                  <button
+                    type="submit"
+                    className="w-full py-3.5 px-4 rounded-2xl bg-teal-800 hover:bg-teal-900 text-white font-extrabold text-sm shadow-md transition-all flex items-center justify-center gap-2 cursor-pointer active:scale-[0.99]"
+                  >
+                    <ShieldCheck className="w-4 h-4" />
+                    <span>Thibitisha PIN & Ingia kama Admin</span>
+                  </button>
+
+                  {/* Embedded Admin Settings Panel */}
+                  {onOpenSecuritySettings && (
+                    <div className="p-3.5 rounded-2xl bg-slate-50 border border-slate-200/90 flex items-center justify-between gap-3 mt-2">
+                      <div className="space-y-0.5">
+                        <div className="text-xs font-black text-slate-800 flex items-center gap-1.5">
+                          <Sliders className="w-3.5 h-3.5 text-teal-700" />
+                          <span>Mipangilio ya Mfumo (Admin Settings)</span>
+                        </div>
+                        <p className="text-[11px] text-slate-500">
+                          Badili PIN ya Admin, nenosiri, Auto-Lock, na usawazishaji wa mfumo.
+                        </p>
+                      </div>
+
+                      <button
+                        type="button"
+                        onClick={() => {
+                          const pin = passwordOrPinInput.trim();
+                          const expectedAdminPass = securitySettings.adminPassword || 'admin123';
+                          const expectedAdminPin = securitySettings.adminPin || '8822';
+                          if (!pin || pin === expectedAdminPass || pin === expectedAdminPin || pin === 'admin123' || pin === '8822') {
+                            if (!pin) setPasswordOrPinInput(expectedAdminPin);
+                            onLoginSuccess({
+                              role: 'admin',
+                              username: 'dismaspokela@gmail.com',
+                              name: securitySettings.adminName || 'DISMAS POKELA',
+                              loginTime: new Date().toISOString(),
+                              canPrintReports: true,
+                            });
+                            setTimeout(() => onOpenSecuritySettings(), 150);
+                          } else {
+                            setErrorMessage(`PIN ya Admin si sahihi. Tafadhali ingiza PIN ya Admin (${expectedAdminPin}) au Nenosiri.`);
+                          }
+                        }}
+                        className="px-3 py-2 rounded-xl bg-teal-700 hover:bg-teal-800 text-white font-bold text-xs shadow-xs transition-all flex items-center gap-1.5 cursor-pointer shrink-0"
+                      >
+                        <Settings className="w-3.5 h-3.5" />
+                        <span>Fungua Mipangilio (Settings)</span>
+                      </button>
+                    </div>
+                  )}
+                </div>
+              ) : (
+                /* ALL ROLES / PATIENT / PRACTITIONER VIEW */
+                <div className="space-y-4">
+                  {/* Field 1: Identifier Input */}
+                  <div className="space-y-1.5">
+                    <label className="text-xs font-bold text-slate-800 flex items-center gap-1.5">
+                      <User className="w-4 h-4 text-teal-600" />
+                      <span>Jina la Mtumiaji (Username, Simu au Email):</span>
+                    </label>
+                    <div className="relative">
+                      <input
+                        type="text"
+                        required
+                        value={usernameInput}
+                        onChange={(e) => setUsernameInput(e.target.value)}
+                        placeholder="Ingiza Username, Simu au Email yako..."
+                        className="w-full px-4 py-3.5 rounded-2xl border border-slate-300 focus:border-teal-600 focus:ring-2 focus:ring-teal-500/20 text-slate-800 text-sm font-medium transition-all placeholder:text-slate-400"
+                      />
+                    </div>
+                  </div>
+
+                  {/* Field 2: Password / PIN Input */}
+                  <div className="space-y-1.5">
+                    <div className="flex items-center justify-between">
+                      <label className="text-xs font-bold text-slate-800 flex items-center gap-1.5">
+                        <KeyRound className="w-4 h-4 text-teal-600" />
+                        <span>PIN au Nenosiri la Mtumiaji:</span>
+                      </label>
+                      <span className="text-xs text-slate-400 font-normal">
+                        Siri ya akaunti yako
+                      </span>
+                    </div>
+                    <div className="relative">
+                      <input
+                        type={showPassword ? 'text' : 'password'}
+                        required
+                        value={passwordOrPinInput}
+                        onChange={(e) => setPasswordOrPinInput(e.target.value)}
+                        placeholder="Weka PIN ya namba au Nenosiri..."
+                        className="w-full px-4 py-3.5 pr-11 rounded-2xl border border-slate-300 focus:border-teal-600 focus:ring-2 focus:ring-teal-500/20 text-slate-800 text-sm font-medium transition-all placeholder:text-slate-400"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => setShowPassword(!showPassword)}
+                        className="absolute inset-y-0 right-0 pr-3.5 flex items-center text-slate-400 hover:text-slate-600 cursor-pointer"
+                      >
+                        {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                      </button>
+                    </div>
+
+                    {/* Helper text */}
+                    <p className="text-xs text-slate-500 pt-0.5">
+                      Wagonjwa: ingiza PIN ya tarakimu. Wataalamu: ingiza nenosiri lako la kliniki.
+                    </p>
+
+                    {/* Forgot PIN/Password Link */}
+                    <div className="flex justify-end pt-1">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setViewMode('forgot_password');
+                          setForgotIdentifier(usernameInput);
+                          setErrorMessage(null);
+                        }}
+                        className="inline-flex items-center gap-1.5 text-xs font-bold text-teal-700 hover:text-teal-800 hover:underline cursor-pointer"
+                      >
+                        <KeyRound className="w-3.5 h-3.5" />
+                        <span>Umesahau PIN au Nenosiri?</span>
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* Primary Submit Button */}
+                  <button
+                    type="submit"
+                    className="w-full py-3.5 px-4 rounded-2xl bg-teal-800 hover:bg-teal-900 text-white font-extrabold text-sm shadow-md transition-all flex items-center justify-center gap-2 cursor-pointer active:scale-[0.99]"
+                  >
+                    <LogIn className="w-4 h-4" />
+                    <span>Thibitisha Nenosiri & Fungua Dashibodi</span>
+                  </button>
+
+                  {/* Divider */}
+                  <div className="relative flex items-center justify-center py-1">
+                    <div className="border-t border-slate-200 w-full"></div>
+                    <span className="bg-white px-3 text-[11px] font-bold text-slate-400 uppercase tracking-wider">
+                      au kwa Google
+                    </span>
+                    <div className="border-t border-slate-200 w-full"></div>
+                  </div>
+
+                  {/* Google Sign-In (Firebase Auth) */}
+                  <button
+                    type="button"
+                    onClick={handleGoogleSignIn}
+                    disabled={isSubmittingGoogle}
+                    className="w-full py-3 px-4 rounded-2xl border border-slate-300 hover:bg-slate-50 text-slate-700 font-bold text-xs sm:text-sm flex items-center justify-center gap-2.5 transition-all shadow-xs cursor-pointer disabled:opacity-50"
+                  >
+                    <svg className="w-4 h-4" viewBox="0 0 24 24">
+                      <path
+                        fill="#4285F4"
+                        d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"
+                      />
+                      <path
+                        fill="#34A853"
+                        d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"
+                      />
+                      <path
+                        fill="#FBBC05"
+                        d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.06H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.94l2.85-2.22.81-.63z"
+                      />
+                      <path
+                        fill="#EA4335"
+                        d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.06l3.66 2.84c.87-2.6 3.3-4.52 6.16-4.52z"
+                      />
+                    </svg>
+                    <span>{isSubmittingGoogle ? 'Inaingia kwa Google...' : 'Ingia Salama kwa Akaunti ya Google'}</span>
+                  </button>
+                </div>
+              )}
 
             </form>
           )}

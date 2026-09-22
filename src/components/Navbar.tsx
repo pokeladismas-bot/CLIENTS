@@ -249,6 +249,19 @@ export const Navbar: React.FC<NavbarProps> = ({
                 {/* ADMIN ACTIONS: DISMAS POKELA */}
                 {authSession.role === 'admin' && (
                   <>
+                    {onOpenSecuritySettings && (
+                      <button
+                        type="button"
+                        onClick={onOpenSecuritySettings}
+                        className="px-3 py-1 rounded-lg bg-teal-700 hover:bg-teal-600 text-white font-black text-xs flex items-center gap-1.5 cursor-pointer shadow-xs transition-colors border border-teal-500/50"
+                        title="Mipangilio ya Msimamizi Mkuu, PIN, Usalama na Mfumo"
+                        id="btn-admin-topbar-settings"
+                      >
+                        <Settings className="w-3.5 h-3.5 text-teal-200" />
+                        <span>⚙️ Mipangilio ya Admin</span>
+                      </button>
+                    )}
+
                     <button
                       onClick={onOpenRegisterPatientModal}
                       className="px-3 py-1 rounded-lg bg-teal-500 hover:bg-teal-400 text-slate-950 font-black text-xs flex items-center gap-1.5 cursor-pointer shadow-xs transition-colors"
@@ -297,16 +310,16 @@ export const Navbar: React.FC<NavbarProps> = ({
                   </button>
                 )}
 
-                {/* PWA App Installation button for Admin & Practitioner */}
-                {(authSession.role === 'admin' || authSession.role === 'practitioner') && onOpenInstallerModal && (
+                {/* Mipangilio ya Ulinzi ya Haraka */}
+                {onOpenSecuritySettings && (
                   <button
                     type="button"
-                    onClick={onOpenInstallerModal}
-                    className="px-2.5 py-1 rounded-lg bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white font-extrabold text-xs flex items-center gap-1.5 cursor-pointer shadow-xs border border-emerald-400/40 transition-all"
-                    title="Sakinisha Mfumo kwenye Kifaa hiki (Kompyuta, Kishikwambi au Simu)"
+                    onClick={onOpenSecuritySettings}
+                    className="px-2.5 py-1 rounded-lg bg-teal-900/80 hover:bg-teal-800 text-teal-200 border border-teal-700 font-bold text-xs flex items-center gap-1.5 cursor-pointer transition-colors"
+                    title="Fungua Mipangilio ya Ulinzi, Nenosiri, na Viwango vya Kliniki"
                   >
-                    <Download className="w-3.5 h-3.5 text-amber-300 animate-pulse" />
-                    <span>Sakinisha App</span>
+                    <ShieldCheck className="w-3.5 h-3.5 text-teal-300" />
+                    <span className="hidden sm:inline">Ulinzi</span>
                   </button>
                 )}
 
@@ -469,12 +482,19 @@ export const Navbar: React.FC<NavbarProps> = ({
               <button
                 type="button"
                 onClick={onOpenSecuritySettings}
-                className="inline-flex items-center gap-1.5 px-2.5 sm:px-3 py-2 rounded-xl bg-teal-50 hover:bg-teal-100 text-teal-800 border border-teal-200 text-xs sm:text-sm font-bold shadow-2xs transition-colors cursor-pointer"
-                title="Mipangilio ya Kitaalamu & Ulinzi Zaidi"
+                className={`inline-flex items-center gap-1.5 px-2.5 sm:px-3 py-2 rounded-xl text-xs sm:text-sm font-bold shadow-2xs transition-colors cursor-pointer ${
+                  authSession?.role === 'admin'
+                    ? 'bg-teal-700 hover:bg-teal-800 text-white border border-teal-600 shadow-sm ring-1 ring-teal-400/40'
+                    : 'bg-teal-50 hover:bg-teal-100 text-teal-800 border border-teal-200'
+                }`}
+                title="Mipangilio ya Msimamizi Mkuu, Ulinzi na Viwango vya Kliniki"
                 id="btn-clinical-security-settings"
               >
-                <ShieldCheck className="w-4 h-4 text-teal-700" />
-                <span className="hidden md:inline">Mipangilio ya Ulinzi</span>
+                <Settings className="w-4 h-4 text-teal-300" />
+                <span className="hidden sm:inline">
+                  {authSession?.role === 'admin' ? '⚙️ Mipangilio ya Admin' : 'Mipangilio ya Ulinzi'}
+                </span>
+                <span className="sm:hidden">Mipangilio</span>
               </button>
             )}
 
@@ -678,6 +698,19 @@ export const Navbar: React.FC<NavbarProps> = ({
                 <Stethoscope className="w-4 h-4 text-teal-500" />
                 <span>Dawati la Mtaalam & Wasajili</span>
               </button>
+
+              {authSession?.role === 'admin' && onOpenSecuritySettings && (
+                <button
+                  type="button"
+                  onClick={onOpenSecuritySettings}
+                  className="px-3 py-1.5 rounded-lg whitespace-nowrap flex items-center gap-1.5 transition-colors cursor-pointer bg-teal-950/80 hover:bg-teal-900 text-teal-300 font-extrabold border border-teal-600/50 shadow-xs"
+                  id="tab-admin-settings"
+                  title="Fungua Mipangilio ya Msimamizi Mkuu, PIN na Usalama wa Mfumo"
+                >
+                  <Settings className="w-4 h-4 text-teal-400" />
+                  <span>⚙️ Mipangilio ya Admin</span>
+                </button>
+              )}
 
               <button
                 onClick={() => setActiveTab('dashboard')}

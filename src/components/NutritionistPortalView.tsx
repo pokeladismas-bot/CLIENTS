@@ -213,16 +213,6 @@ export const NutritionistPortalView: React.FC<NutritionistPortalViewProps> = ({
         </div>
 
         <div className="flex flex-wrap items-center gap-3 w-full md:w-auto">
-          {onOpenInstallerModal && (
-            <button
-              onClick={onOpenInstallerModal}
-              className="flex-1 md:flex-initial px-4 py-3 rounded-2xl bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white font-black text-sm shadow-md border border-emerald-400/40 transition-all flex items-center justify-center gap-2 cursor-pointer"
-              title="Sakinisha Mfumo kwenye Kifaa hiki (Kompyuta au Simu ya Kliniki)"
-            >
-              <Download className="w-4 h-4 text-amber-300 animate-pulse" />
-              <span>📲 Sakinisha App</span>
-            </button>
-          )}
 
           {onOpenSecuritySettings && (
             <button

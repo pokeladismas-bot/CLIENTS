@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { 
   ShieldCheck, Lock, KeyRound, Clock, FileCheck2, UserCheck, 
   Eye, EyeOff, Save, CheckCircle2, AlertTriangle, Building2, 
@@ -25,6 +25,7 @@ export const ClinicalSecuritySettingsModal: React.FC<ClinicalSecuritySettingsMod
   const [adminName, setAdminName] = useState(securitySettings.adminName || 'DISMAS POKELA');
   const [adminEmail, setAdminEmail] = useState(securitySettings.adminEmail || 'dismaspokela@gmail.com');
   const [adminPassword, setAdminPassword] = useState(securitySettings.adminPassword || 'admin123');
+  const [adminPin, setAdminPin] = useState(securitySettings.adminPin || '8822');
   const [showPassword, setShowPassword] = useState(false);
 
   // Security Toggles
@@ -32,7 +33,10 @@ export const ClinicalSecuritySettingsModal: React.FC<ClinicalSecuritySettingsMod
   const [allowPatientPrinting, setAllowPatientPrinting] = useState(securitySettings.allowPatientPrinting ?? true);
   const [twoFactorAuthEnabled, setTwoFactorAuthEnabled] = useState(securitySettings.twoFactorAuthEnabled ?? true);
   const [twoFactorPin, setTwoFactorPin] = useState(securitySettings.twoFactorPin || '8822');
-  const [sessionTimeoutMinutes, setSessionTimeoutMinutes] = useState<number>(securitySettings.sessionTimeoutMinutes ?? 30);
+  const [sessionTimeoutMinutes, setSessionTimeoutMinutes] = useState<number>(securitySettings.sessionTimeoutMinutes ?? 15);
+  const [autoLockMinutes, setAutoLockMinutes] = useState<number>(securitySettings.autoLockMinutes ?? 10);
+  const [autoSyncEnabled, setAutoSyncEnabled] = useState<boolean>(securitySettings.autoSyncEnabled ?? true);
+  const [syncIntervalSeconds, setSyncIntervalSeconds] = useState<number>(securitySettings.syncIntervalSeconds ?? 30);
   
   // Clinical Governance & Compliance
   const [hospitalFacilityName, setHospitalFacilityName] = useState(securitySettings.hospitalFacilityName || 'AFYALISHE TANZANIA • CLINICAL NUTRITION & METABOLIC CARE');
@@ -44,6 +48,29 @@ export const ClinicalSecuritySettingsModal: React.FC<ClinicalSecuritySettingsMod
 
   const [savedSuccess, setSavedSuccess] = useState(false);
 
+  useEffect(() => {
+    if (isOpen) {
+      setAdminName(securitySettings.adminName || 'DISMAS POKELA');
+      setAdminEmail(securitySettings.adminEmail || 'dismaspokela@gmail.com');
+      setAdminPassword(securitySettings.adminPassword || 'admin123');
+      setAdminPin(securitySettings.adminPin || '8822');
+      setRequireLoginFirst(securitySettings.requireLoginFirst ?? true);
+      setAllowPatientPrinting(securitySettings.allowPatientPrinting ?? true);
+      setTwoFactorAuthEnabled(securitySettings.twoFactorAuthEnabled ?? true);
+      setTwoFactorPin(securitySettings.twoFactorPin || '8822');
+      setSessionTimeoutMinutes(securitySettings.sessionTimeoutMinutes ?? 15);
+      setAutoLockMinutes(securitySettings.autoLockMinutes ?? 10);
+      setAutoSyncEnabled(securitySettings.autoSyncEnabled ?? true);
+      setSyncIntervalSeconds(securitySettings.syncIntervalSeconds ?? 30);
+      setHospitalFacilityName(securitySettings.hospitalFacilityName || 'AFYALISHE TANZANIA • CLINICAL NUTRITION & METABOLIC CARE');
+      setRegistrationCouncilLicense(securitySettings.registrationCouncilLicense || 'MCT/TZ/NUTR-2026/0894');
+      setWatermarkMedicalReports(securitySettings.watermarkMedicalReports ?? true);
+      setStrictDoctorVerification(securitySettings.strictDoctorVerification ?? true);
+      setAuditLoggingEnabled(securitySettings.auditLoggingEnabled ?? true);
+      setClinicalEncryptionBadge(securitySettings.clinicalEncryptionBadge ?? true);
+    }
+  }, [isOpen, securitySettings]);
+
   if (!isOpen) return null;
 
   const handleSave = (e: React.FormEvent) => {
@@ -54,11 +81,15 @@ export const ClinicalSecuritySettingsModal: React.FC<ClinicalSecuritySettingsMod
       adminName,
       adminEmail,
       adminPassword,
+      adminPin,
       requireLoginFirst,
       allowPatientPrinting,
       twoFactorAuthEnabled,
       twoFactorPin,
       sessionTimeoutMinutes: Number(sessionTimeoutMinutes),
+      autoLockMinutes: Number(autoLockMinutes),
+      autoSyncEnabled,
+      syncIntervalSeconds: Number(syncIntervalSeconds),
       hospitalFacilityName,
       registrationCouncilLicense,
       watermarkMedicalReports,
@@ -194,7 +225,7 @@ export const ClinicalSecuritySettingsModal: React.FC<ClinicalSecuritySettingsMod
                     />
                   </div>
 
-                  <div className="sm:col-span-2">
+                  <div>
                     <label className="block text-xs font-bold text-slate-700 mb-1">
                       Nenosiri Kuu la Admin (Master Password):
                     </label>
@@ -215,7 +246,25 @@ export const ClinicalSecuritySettingsModal: React.FC<ClinicalSecuritySettingsMod
                       </button>
                     </div>
                     <span className="text-[10px] text-slate-500 mt-1 block">
-                      Nenosiri hili linatumika kufungua Mfumo na kuingia kwenye dawati la Admin DISMAS POKELA.
+                      Nenosiri la herufi/namba (chaguo-msingi: admin123).
+                    </span>
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-bold text-slate-700 mb-1">
+                      PIN ya Kuingia ya Haraka ya Admin (Admin PIN):
+                    </label>
+                    <input
+                      type="text"
+                      maxLength={8}
+                      value={adminPin}
+                      onChange={(e) => setAdminPin(e.target.value)}
+                      placeholder="8822"
+                      required
+                      className="w-full px-3 py-2 rounded-xl border border-slate-300 text-xs font-mono font-bold text-slate-900 focus:outline-teal-600 bg-white"
+                    />
+                    <span className="text-[10px] text-slate-500 mt-1 block">
+                      PIN ya tarakimu (chaguo-msingi: 8822). Inatumika kuingia haraka na kufungua Mipangilio.
                     </span>
                   </div>
                 </div>
@@ -281,27 +330,84 @@ export const ClinicalSecuritySettingsModal: React.FC<ClinicalSecuritySettingsMod
                   )}
                 </div>
 
-                {/* Session Timeout */}
+                {/* Automatic Lock Timeout */}
                 <div className="p-3.5 rounded-2xl bg-white border border-slate-200 flex items-center justify-between gap-3">
                   <div className="space-y-0.5">
                     <div className="text-xs font-black text-slate-900 flex items-center gap-1.5">
                       <Clock className="w-3.5 h-3.5 text-blue-600" />
-                      <span>Kujifunga Kiotomatiki Baada ya Kutotumika (Auto-Lock Timeout)</span>
+                      <span>Kufunga Mfumo Kiotomatiki (Automatic Inactivity Lock)</span>
                     </div>
                     <p className="text-[11px] text-slate-500">
-                      Mfumo utafunga skrini mgonjwa au mtaalamu akiondoka kwenye kompyuta.
+                      Mfumo utafunga skrini na kuhitaji nenosiri mtumiaji akikaa bila kufanya chochote.
                     </p>
                   </div>
                   <select
-                    value={sessionTimeoutMinutes}
-                    onChange={(e) => setSessionTimeoutMinutes(Number(e.target.value))}
+                    value={autoLockMinutes}
+                    onChange={(e) => {
+                      const val = Number(e.target.value);
+                      setAutoLockMinutes(val);
+                      setSessionTimeoutMinutes(val);
+                    }}
                     className="px-3 py-1.5 rounded-xl border border-slate-300 text-xs font-bold text-slate-800 bg-white"
                   >
+                    <option value={1}>Dakika 1 (Haraka)</option>
+                    <option value={2}>Dakika 2</option>
+                    <option value={5}>Dakika 5 (Inashauriwa)</option>
+                    <option value={10}>Dakika 10</option>
                     <option value={15}>Dakika 15</option>
                     <option value={30}>Dakika 30</option>
-                    <option value={60}>Saa 1 (Dakika 60)</option>
-                    <option value={0}>Kamwe (Usifunge)</option>
+                    <option value={0}>Kamwe (Usifunge Kiotomatiki)</option>
                   </select>
+                </div>
+
+                {/* Periodic Updation / Auto-Sync */}
+                <div className="p-3.5 rounded-2xl bg-white border border-slate-200 space-y-3">
+                  <div className="flex items-center justify-between gap-3">
+                    <div className="space-y-0.5">
+                      <div className="text-xs font-black text-slate-900 flex items-center gap-1.5">
+                        <RefreshCw className="w-3.5 h-3.5 text-teal-600" />
+                        <span>Usasishaji wa Mara kwa Mara wa Taarifa (Continuous Pipeline Auto-Update)</span>
+                      </div>
+                      <p className="text-[11px] text-slate-500">
+                        Inasasisha taarifa zote mfululizo kwa mtiririko rasmi:
+                      </p>
+                    </div>
+                    <input
+                      type="checkbox"
+                      checked={autoSyncEnabled}
+                      onChange={(e) => setAutoSyncEnabled(e.target.checked)}
+                      className="w-5 h-5 accent-teal-600 cursor-pointer rounded"
+                    />
+                  </div>
+
+                  {/* Visual Pipeline flow */}
+                  <div className="p-2.5 rounded-xl bg-slate-900 text-slate-200 text-[11px] font-mono flex flex-wrap items-center gap-1.5 justify-center border border-slate-800">
+                    <span className="text-amber-400 font-bold">Firebase</span>
+                    <span className="text-slate-500">↓</span>
+                    <span className="text-emerald-400 font-bold">User Data</span>
+                    <span className="text-slate-500">↓</span>
+                    <span className="text-blue-400 font-bold">Settings</span>
+                    <span className="text-slate-500">↓</span>
+                    <span className="text-purple-400 font-bold">Reports</span>
+                    <span className="text-slate-500">↓</span>
+                    <span className="text-cyan-400 font-bold">Records</span>
+                  </div>
+
+                  {autoSyncEnabled && (
+                    <div className="flex items-center justify-between gap-3 pt-2 border-t border-slate-100">
+                      <label className="text-xs font-bold text-slate-700">Muda wa Mzunguko wa Kusasisha (Interval):</label>
+                      <select
+                        value={syncIntervalSeconds}
+                        onChange={(e) => setSyncIntervalSeconds(Number(e.target.value))}
+                        className="px-3 py-1 rounded-lg border border-slate-300 text-xs font-bold text-slate-800 bg-white"
+                      >
+                        <option value={15}>Kila sekunde 15 (Live)</option>
+                        <option value={30}>Kila sekunde 30 (Kawaida)</option>
+                        <option value={60}>Kila dakika 1</option>
+                        <option value={300}>Kila dakika 5</option>
+                      </select>
+                    </div>
+                  )}
                 </div>
               </div>
             </div>

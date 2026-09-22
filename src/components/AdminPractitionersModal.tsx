@@ -346,18 +346,6 @@ AfyaLishe Tanzania - Huduma Bora ya Lishe na Tiba.`;
           </div>
 
           <div className="flex items-center gap-2 py-1">
-            {onOpenInstallerModal && (
-              <button
-                type="button"
-                onClick={onOpenInstallerModal}
-                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white font-extrabold text-xs shadow-xs border border-emerald-400/30 transition-all cursor-pointer"
-                title="Sakinisha Mfumo kwenye Kifaa hiki (PWA App)"
-              >
-                <Download className="w-3.5 h-3.5 text-amber-300 animate-pulse" />
-                <span>📲 Sakinisha App</span>
-              </button>
-            )}
-
             {activeSubTab === 'list' && (
               <button
                 onClick={handleOpenAdd}

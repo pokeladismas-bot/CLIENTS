@@ -1,12 +1,15 @@
 import React, { useState } from 'react';
-import { User, X, CheckCircle2, ShieldCheck, HeartPulse, Scale, Bell, Clock, Volume2 } from 'lucide-react';
-import { DailyReminderConfig, DiabetesType, GlucoseUnit, UserProfile } from '../types';
+import { User, X, CheckCircle2, ShieldCheck, HeartPulse, Scale, Bell, Clock, Volume2, Settings, Sliders, Lock, KeyRound } from 'lucide-react';
+import { AuthSession, DailyReminderConfig, DiabetesType, GlucoseUnit, SecuritySettings, UserProfile } from '../types';
 
 interface ProfileModalProps {
   isOpen: boolean;
   onClose: () => void;
   profile: UserProfile;
   onSaveProfile: (updated: UserProfile) => void;
+  authSession?: AuthSession | null;
+  securitySettings?: SecuritySettings;
+  onOpenSecuritySettings?: () => void;
 }
 
 export const ProfileModal: React.FC<ProfileModalProps> = ({
@@ -14,6 +17,9 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({
   onClose,
   profile,
   onSaveProfile,
+  authSession = null,
+  securitySettings,
+  onOpenSecuritySettings,
 }) => {
   const [name, setName] = useState<string>(profile.name);
   const [diabetesType, setDiabetesType] = useState<DiabetesType>(profile.diabetesType);
@@ -368,6 +374,61 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({
               <div className="w-9 h-5 bg-slate-300 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-teal-600"></div>
             </label>
           </div>
+
+          {/* Admin Dedicated System Settings Block */}
+          {(authSession?.role === 'admin' || isAdmin) && (
+            <div className="p-4 bg-teal-50/90 rounded-2xl border-2 border-teal-500/50 space-y-3">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <div className="w-8 h-8 rounded-xl bg-teal-800 text-teal-200 flex items-center justify-center font-black">
+                    <ShieldCheck className="w-5 h-5 text-teal-300" />
+                  </div>
+                  <div>
+                    <span className="text-xs font-black text-slate-900 block">Mipangilio ya Msimamizi Mkuu (Admin Settings)</span>
+                    <span className="text-[11px] text-teal-800 font-medium">Akaunti: {securitySettings?.adminEmail || 'dismaspokela@gmail.com'}</span>
+                  </div>
+                </div>
+                <span className="text-[10px] bg-teal-700 text-white font-black px-2 py-0.5 rounded-full uppercase tracking-wider">
+                  Admin
+                </span>
+              </div>
+
+              <div className="text-xs text-slate-700 space-y-1.5 bg-white p-3 rounded-xl border border-teal-200/80">
+                <div className="flex justify-between items-center">
+                  <span className="text-slate-500 font-medium">PIN ya Admin ya Haraka:</span>
+                  <span className="font-mono font-bold text-teal-900 bg-teal-50 px-2 py-0.5 rounded border border-teal-200">{securitySettings?.adminPin || '8822'}</span>
+                </div>
+                <div className="flex justify-between items-center">
+                  <span className="text-slate-500 font-medium">Nenosiri Kuu la Mfumo:</span>
+                  <span className="font-mono font-bold text-slate-700">••••••••</span>
+                </div>
+                <div className="flex justify-between items-center">
+                  <span className="text-slate-500 font-medium">Kufunga Mfumo (Auto-Lock):</span>
+                  <span className="font-bold text-slate-800">Dakika {securitySettings?.autoLockMinutes || 10}</span>
+                </div>
+                <div className="flex justify-between items-center">
+                  <span className="text-slate-500 font-medium">Usawazishaji (Auto-Sync):</span>
+                  <span className="font-bold text-emerald-700">
+                    {securitySettings?.autoSyncEnabled !== false ? `Kila sekunde ${securitySettings?.syncIntervalSeconds || 30}` : 'Imezimwa'}
+                  </span>
+                </div>
+              </div>
+
+              {onOpenSecuritySettings && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    onClose();
+                    onOpenSecuritySettings();
+                  }}
+                  className="w-full py-2.5 px-3 rounded-xl bg-teal-700 hover:bg-teal-800 active:scale-[0.99] text-white text-xs font-black transition-all flex items-center justify-center gap-2 cursor-pointer shadow-xs"
+                >
+                  <Sliders className="w-4 h-4 text-teal-200" />
+                  <span>Fungua Mipangilio Kamili ya Usalama & Mfumo</span>
+                </button>
+              )}
+            </div>
+          )}
 
           <div className="pt-3">
             <button

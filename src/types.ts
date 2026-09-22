@@ -104,11 +104,18 @@ export interface AuthSession {
 
 export interface SecuritySettings {
   adminPassword: string; // Default: 'admin123'
+  adminPin?: string; // PIN ya Kuingia ya Haraka ya Admin (Default: '8822')
   adminName: string; // 'DISMAS POKELA'
   adminEmail: string; // 'dismaspokela@gmail.com'
   allowPatientPrinting: boolean; // Controlled by Admin: whether patients can print/download reports
   requireAdminApprovalForExport: boolean;
   requireLoginFirst: boolean; // Require password/login gate before using the app
+
+  // Mfumo wa Kujifunga Kiotomatiki na Usasishaji wa Mara kwa Mara
+  autoLockMinutes?: number; // Dakika za mfumo kujifunga kiotomatiki (e.g. 1, 3, 5, 10, 15, 30)
+  autoSyncEnabled?: boolean; // Usasishaji wa mara kwa mara wa Firebase -> User Data -> Settings -> Reports -> Records
+  syncIntervalSeconds?: number; // Muda wa mzunguko wa kusasisha taarifa (e.g. 15, 30, 60 sekunde)
+  lastSyncedAt?: string; // Wakati taarifa zilisasishwa mara ya mwisho
 
   // Mfumo wa Kitaalamu & Ulinzi Zaidi (Professional & Advanced Security Controls)
   twoFactorAuthEnabled?: boolean; // Uthibitishaji wa Hatua Mbili (PIN ya pili kwa Admin)

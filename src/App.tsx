@@ -34,6 +34,8 @@ import { ThemeSwitcherModal } from './components/ThemeSwitcherModal';
 import { AuthGateView } from './components/AuthGateView';
 import { AppInstallerModal } from './components/AppInstallerModal';
 import { ClinicalSecuritySettingsModal } from './components/ClinicalSecuritySettingsModal';
+import { SystemDataSyncBar } from './components/SystemDataSyncBar';
+import { performFullSystemSync } from './services/dataSyncService';
 import { DASHBOARD_THEMES, getSavedTheme, saveTheme } from './utils/theme';
 import { testFirestoreConnection } from './services/firebase';
 import { 
@@ -65,11 +67,15 @@ import { playReminderChime } from './utils/reminderSound';
 
 const DEFAULT_SECURITY_SETTINGS: SecuritySettings = {
   adminPassword: 'admin123',
+  adminPin: '8822',
   adminName: 'DISMAS POKELA',
   adminEmail: 'dismaspokela@gmail.com',
   allowPatientPrinting: true,
   requireAdminApprovalForExport: false,
   requireLoginFirst: true,
+  autoLockMinutes: 10,
+  autoSyncEnabled: true,
+  syncIntervalSeconds: 30,
 };
 
 export default function App() {
@@ -519,6 +525,116 @@ export default function App() {
     setSystemLockNotice('Mfumo umefungwa salama. Weka nenosiri lako la mtumiaji kufungua tena mfumo.');
   };
 
+  // --- AUTOMATIC INACTIVITY LOCK ---
+  const autoLockMinutes = securitySettings.autoLockMinutes ?? securitySettings.sessionTimeoutMinutes ?? 10;
+
+  const handleLockSystem = (reason?: string) => {
+    setAuthSession(null);
+    localStorage.removeItem('afyalishe_auth_session');
+    setIsAuthModalOpen(false);
+    setSystemLockNotice(
+      reason || `🔒 Mfumo umefungwa kiotomatiki kwa sababu ya kutotumika kwa dakika ${autoLockMinutes}. Tafadhali weka nenosiri au PIN yako ili kufungua tena.`
+    );
+  };
+
+  useEffect(() => {
+    if (!authSession) return;
+    if (!autoLockMinutes || autoLockMinutes <= 0) return;
+
+    const timeoutMs = autoLockMinutes * 60 * 1000;
+    let timerId: ReturnType<typeof setTimeout>;
+
+    const resetTimer = () => {
+      clearTimeout(timerId);
+      timerId = setTimeout(() => {
+        handleLockSystem(`🔒 Mfumo umefungwa kiotomatiki kwa usalama baada ya kutotumika kwa dakika ${autoLockMinutes}. Weka nenosiri au PIN kufungua.`);
+      }, timeoutMs);
+    };
+
+    const events = ['mousemove', 'mousedown', 'keydown', 'touchstart', 'scroll', 'click'];
+    events.forEach((evt) => window.addEventListener(evt, resetTimer, { passive: true }));
+
+    resetTimer();
+
+    return () => {
+      clearTimeout(timerId);
+      events.forEach((evt) => window.removeEventListener(evt, resetTimer));
+    };
+  }, [authSession, autoLockMinutes]);
+
+  // --- PERIODIC DATA PIPELINE UPDATION ---
+  // Mtiririko: Firebase -> User Data -> Settings -> Reports -> Records
+  const [isSystemSyncing, setIsSystemSyncing] = useState<boolean>(false);
+  const [lastSyncedTimeStr, setLastSyncedTimeStr] = useState<string>(() => {
+    const d = new Date();
+    return d.toLocaleTimeString('sw-TZ', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+  });
+
+  const performDataSync = async (silent = false) => {
+    if (isSystemSyncing) return;
+    setIsSystemSyncing(true);
+    try {
+      const result = await performFullSystemSync({
+        patients,
+        doctors,
+        profile,
+        securitySettings,
+        glucoseLogs,
+        mealLogs: meals,
+        waterGlassesToday,
+      });
+
+      const formattedTime = result.timestamp.toLocaleTimeString('sw-TZ', {
+        hour: '2-digit',
+        minute: '2-digit',
+        second: '2-digit',
+      });
+      setLastSyncedTimeStr(formattedTime);
+
+      setSecuritySettings((prev) => {
+        const next = { ...prev, lastSyncedAt: formattedTime };
+        localStorage.setItem('afyalishe_security_settings', JSON.stringify(next));
+        return next;
+      });
+    } catch (err) {
+      console.warn('Periodic sync notice:', err);
+    } finally {
+      setIsSystemSyncing(false);
+    }
+  };
+
+  // Periodic timer for continuous update
+  useEffect(() => {
+    const isAutoSync = securitySettings.autoSyncEnabled ?? true;
+    if (!isAutoSync) return;
+
+    const intervalSeconds = securitySettings.syncIntervalSeconds || 30;
+    const intervalMs = Math.max(10, intervalSeconds) * 1000;
+
+    // Trigger initial background sync
+    const initialTimer = setTimeout(() => {
+      performDataSync(true);
+    }, 2000);
+
+    const intervalId = setInterval(() => {
+      performDataSync(true);
+    }, intervalMs);
+
+    return () => {
+      clearTimeout(initialTimer);
+      clearInterval(intervalId);
+    };
+  }, [
+    securitySettings.autoSyncEnabled,
+    securitySettings.syncIntervalSeconds,
+    patients,
+    doctors,
+    securitySettings,
+    glucoseLogs,
+    meals,
+    waterGlassesToday,
+  ]);
+
   const handleToggleRequireLoginFirst = () => {
     setSecuritySettings((prev) => {
       const updated = {
@@ -549,11 +665,11 @@ export default function App() {
           onLoginSuccess={handleLoginSuccess}
           currentTheme={currentTheme}
           onOpenThemeModal={() => setIsThemeModalOpen(true)}
+          onOpenSecuritySettings={() => setIsSecuritySettingsModalOpen(true)}
           onUpdatePatientPassword={handleUpdatePatientPassword}
           onUpdateDoctorPassword={handleUpdateDoctorPassword}
           onUpdateAdminPassword={handleUpdateAdminPassword}
           lockedNotice={systemLockNotice}
-          onOpenInstallerModal={() => setIsInstallerModalOpen(true)}
         />
 
         {/* Theme Switcher Modal Accessible on Gate */}
@@ -564,12 +680,12 @@ export default function App() {
           onSelectTheme={handleSelectTheme}
         />
 
-        {/* PWA App Installer Modal Accessible from Gate */}
-        <AppInstallerModal
-          isOpen={isInstallerModalOpen}
-          onClose={() => setIsInstallerModalOpen(false)}
-          userRole="practitioner"
-          userName="Mtumiaji wa Kliniki"
+        {/* Clinical Security Settings Modal Accessible by Admin */}
+        <ClinicalSecuritySettingsModal
+          isOpen={isSecuritySettingsModalOpen}
+          onClose={() => setIsSecuritySettingsModalOpen(false)}
+          securitySettings={securitySettings}
+          onUpdateSecuritySettings={setSecuritySettings}
         />
       </div>
     );
@@ -622,6 +738,19 @@ export default function App() {
         onOpenThemeModal={() => setIsThemeModalOpen(true)}
         onOpenInstallerModal={() => setIsInstallerModalOpen(true)}
         onOpenSecuritySettings={() => setIsSecuritySettingsModalOpen(true)}
+        onOpenAdminBackupModal={() => setIsDriveModalOpen(true)}
+      />
+
+      {/* Live Pipeline Updation Bar: Firebase -> User Data -> Settings -> Reports -> Records */}
+      <SystemDataSyncBar
+        isSyncing={isSystemSyncing}
+        lastSyncedTime={lastSyncedTimeStr}
+        autoSyncEnabled={securitySettings.autoSyncEnabled ?? true}
+        syncIntervalSeconds={securitySettings.syncIntervalSeconds || 30}
+        autoLockMinutes={autoLockMinutes}
+        onManualSync={() => performDataSync(false)}
+        onLockSystem={() => handleLockSystem('🔒 Mfumo umefungwa. Weka nenosiri au PIN yako kufungua tena.')}
+        onOpenSecuritySettings={() => setIsSecuritySettingsModalOpen(true)}
       />
 
       {/* Main Content Area */}
@@ -645,6 +774,7 @@ export default function App() {
             onOpenAdminPractitionersModal={() => setIsAdminPractitionersModalOpen(true)}
             onOpenInstallerModal={() => setIsInstallerModalOpen(true)}
             onOpenSecuritySettings={() => setIsSecuritySettingsModalOpen(true)}
+            onOpenAdminBackupModal={() => setIsDriveModalOpen(true)}
             onOpenPrintReport={(glucoseVal) => {
               const fakeLog: GlucoseLog = {
                 id: 'report-' + Date.now(),
@@ -844,6 +974,12 @@ export default function App() {
         onClose={() => setIsProfileModalOpen(false)}
         profile={profile}
         onSaveProfile={setProfile}
+        authSession={authSession}
+        securitySettings={securitySettings}
+        onOpenSecuritySettings={() => {
+          setIsProfileModalOpen(false);
+          setIsSecuritySettingsModalOpen(true);
+        }}
       />
 
       {/* Print / Export Report Modal */}
