@@ -262,6 +262,19 @@ export const Navbar: React.FC<NavbarProps> = ({
                       </button>
                     )}
 
+                    {onOpenChangePasswordModal && (
+                      <button
+                        type="button"
+                        onClick={onOpenChangePasswordModal}
+                        className="px-3 py-1 rounded-lg bg-emerald-700 hover:bg-emerald-600 text-white font-black text-xs flex items-center gap-1.5 cursor-pointer shadow-xs transition-colors border border-emerald-500/50"
+                        title="Badilisha Nenosiri la Admin (Admin Password)"
+                        id="btn-admin-topbar-password"
+                      >
+                        <KeyRound className="w-3.5 h-3.5 text-emerald-200" />
+                        <span>🔑 Badilisha Nenosiri</span>
+                      </button>
+                    )}
+
                     <button
                       onClick={onOpenRegisterPatientModal}
                       className="px-3 py-1 rounded-lg bg-teal-500 hover:bg-teal-400 text-slate-950 font-black text-xs flex items-center gap-1.5 cursor-pointer shadow-xs transition-colors"
@@ -495,6 +508,19 @@ export const Navbar: React.FC<NavbarProps> = ({
                   {authSession?.role === 'admin' ? '⚙️ Mipangilio ya Admin' : 'Mipangilio ya Ulinzi'}
                 </span>
                 <span className="sm:hidden">Mipangilio</span>
+              </button>
+            )}
+
+            {authSession && onOpenChangePasswordModal && (
+              <button
+                type="button"
+                onClick={onOpenChangePasswordModal}
+                className="inline-flex items-center gap-1.5 px-2.5 sm:px-3 py-2 rounded-xl text-xs sm:text-sm font-bold bg-amber-50 hover:bg-amber-100 text-amber-900 border border-amber-200 shadow-2xs transition-colors cursor-pointer"
+                title="Badilisha Nenosiri Lako la Kuingilia Mfumo"
+                id="btn-change-password-header"
+              >
+                <KeyRound className="w-4 h-4 text-amber-600" />
+                <span className="hidden md:inline">Badilisha Nenosiri</span>
               </button>
             )}
 

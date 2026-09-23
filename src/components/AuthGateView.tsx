@@ -3,8 +3,8 @@ import {
   ShieldCheck, Lock, User, KeyRound, Eye, EyeOff, CheckCircle2, 
   AlertCircle, Sparkles, UserCheck, Stethoscope, HeartPulse, Scale,
   ArrowRight, ShieldAlert, LogIn, ChevronRight, Mail, Shield, Phone,
-  ArrowLeft, Copy, Check, ExternalLink, Send, RefreshCw, Palette,
-  Info, Utensils, Download, Sliders, Settings
+  ArrowLeft, Copy, Check, ExternalLink, Send, RefreshCw,
+  Info, Utensils, Download
 } from 'lucide-react';
 import { AuthSession, DashboardTheme, OnlineDoctor, RegisteredPatient, SecuritySettings, UserRole } from '../types';
 import { signInWithGoogleAuth } from '../services/firebase';
@@ -16,8 +16,6 @@ interface AuthGateViewProps {
   securitySettings: SecuritySettings;
   onLoginSuccess: (session: AuthSession) => void;
   currentTheme: DashboardTheme;
-  onOpenThemeModal?: () => void;
-  onOpenSecuritySettings?: () => void;
   onUpdatePatientPassword?: (patientId: string, newPass: string) => void;
   onUpdateDoctorPassword?: (doctorId: string, newPass: string) => void;
   onUpdateAdminPassword?: (newPass: string) => void;
@@ -31,8 +29,6 @@ export const AuthGateView: React.FC<AuthGateViewProps> = ({
   securitySettings,
   onLoginSuccess,
   currentTheme,
-  onOpenThemeModal,
-  onOpenSecuritySettings,
   onUpdatePatientPassword,
   onUpdateDoctorPassword,
   onUpdateAdminPassword,
@@ -108,12 +104,38 @@ export const AuthGateView: React.FC<AuthGateViewProps> = ({
       cleanId === 'dismas pokela';
 
     if (isAdminMatch && (selectedRoleTab === 'all' || selectedRoleTab === 'admin')) {
-      const expectedAdminPass = securitySettings.adminPassword || 'admin123';
-      const expectedAdminPin = securitySettings.adminPin || '8822';
-      const isPinMatch = pinOrPass === expectedAdminPin || pinOrPass === '8822';
-      const isPassMatch = pinOrPass === expectedAdminPass || pinOrPass === 'admin123';
+      let localSavedPass = '';
+      let customAdminPass = '';
+      try {
+        if (typeof window !== 'undefined') {
+          customAdminPass = (localStorage.getItem('afyalishe_custom_admin_password') || '').trim();
+          const raw = localStorage.getItem('afyalishe_security_settings');
+          if (raw) {
+            const parsed = JSON.parse(raw);
+            if (parsed.adminPassword) localSavedPass = (parsed.adminPassword as string).trim();
+          }
+        }
+      } catch {}
+
+      const cleanEnteredPass = pinOrPass.trim();
+      const expectedAdminPass = (securitySettings.adminPassword || '').trim() || 'admin123';
+      const expectedAdminPin = (securitySettings.adminPin || '').trim() || '8822';
+      const isPinMatch = cleanEnteredPass === expectedAdminPin || cleanEnteredPass === '8822';
+      const isPassMatch = 
+        cleanEnteredPass === expectedAdminPass || 
+        (customAdminPass && cleanEnteredPass === customAdminPass) ||
+        (localSavedPass && cleanEnteredPass === localSavedPass) ||
+        cleanEnteredPass === 'admin123';
 
       if (isPinMatch || isPassMatch) {
+        // If user logged in using their new password, keep it synced in local storage
+        if (cleanEnteredPass && cleanEnteredPass !== 'admin123' && cleanEnteredPass !== expectedAdminPin) {
+          try {
+            localStorage.setItem('afyalishe_custom_admin_password', cleanEnteredPass);
+          } catch {}
+          onUpdateAdminPassword?.(cleanEnteredPass);
+        }
+
         const session: AuthSession = {
           role: 'admin',
           username: 'dismaspokela@gmail.com',
@@ -124,7 +146,7 @@ export const AuthGateView: React.FC<AuthGateViewProps> = ({
         onLoginSuccess(session);
         return;
       } else if (selectedRoleTab === 'admin') {
-        setErrorMessage(`PIN ya Admin au Nenosiri si sahihi. Weka PIN sahihi ya tarakimu (mfano: ${expectedAdminPin}) au Nenosiri.`);
+        setErrorMessage('Nenosiri la Admin si sahihi. Tafadhali ingiza nenosiri jipya uliloweka (au la awali: admin123).');
         return;
       }
     }
@@ -374,17 +396,6 @@ export const AuthGateView: React.FC<AuthGateViewProps> = ({
                 <Lock className="w-3 h-3 text-teal-400" />
                 <span>Ulinzi wa Nenosiri</span>
               </div>
-
-              {onOpenThemeModal && (
-                <button
-                  type="button"
-                  onClick={onOpenThemeModal}
-                  className="p-1.5 rounded-xl bg-white/10 hover:bg-white/20 text-teal-200 hover:text-white transition-all cursor-pointer"
-                  title="Badilisha Mandhari"
-                >
-                  <Palette className="w-4 h-4" />
-                </button>
-              )}
             </div>
           </div>
 
@@ -425,55 +436,55 @@ export const AuthGateView: React.FC<AuthGateViewProps> = ({
                 <span>Wote</span>
               </button>
 
-              <button
-                type="button"
-                onClick={() => {
-                  setSelectedRoleTab('patient');
-                  setErrorMessage(null);
-                }}
-                className={`flex-1 py-2 px-3 rounded-xl text-xs font-extrabold transition-all flex items-center justify-center gap-1.5 cursor-pointer ${
-                  selectedRoleTab === 'patient'
-                    ? 'bg-white text-slate-900 shadow-md'
-                    : 'text-teal-300 hover:text-white hover:bg-white/5'
-                }`}
-              >
-                <User className="w-3.5 h-3.5 text-teal-400" />
-                <span>Mgonjwa</span>
-              </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setSelectedRoleTab('patient');
+                    setErrorMessage(null);
+                  }}
+                  className={`flex-1 py-2 px-3 rounded-xl text-xs font-extrabold transition-all flex items-center justify-center gap-1.5 cursor-pointer ${
+                    selectedRoleTab === 'patient'
+                      ? 'bg-white text-slate-900 shadow-md'
+                      : 'text-teal-300 hover:text-white hover:bg-white/5'
+                  }`}
+                >
+                  <User className="w-3.5 h-3.5 text-teal-400" />
+                  <span>Mgonjwa</span>
+                </button>
 
-              <button
-                type="button"
-                onClick={() => {
-                  setSelectedRoleTab('practitioner');
-                  setErrorMessage(null);
-                }}
-                className={`flex-1 py-2 px-3 rounded-xl text-xs font-extrabold transition-all flex items-center justify-center gap-1.5 cursor-pointer ${
-                  selectedRoleTab === 'practitioner'
-                    ? 'bg-white text-slate-900 shadow-md'
-                    : 'text-teal-300 hover:text-white hover:bg-white/5'
-                }`}
-              >
-                <Stethoscope className="w-3.5 h-3.5 text-teal-400" />
-                <span>Mtaalamu</span>
-              </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setSelectedRoleTab('practitioner');
+                    setErrorMessage(null);
+                  }}
+                  className={`flex-1 py-2 px-3 rounded-xl text-xs font-extrabold transition-all flex items-center justify-center gap-1.5 cursor-pointer ${
+                    selectedRoleTab === 'practitioner'
+                      ? 'bg-white text-slate-900 shadow-md'
+                      : 'text-teal-300 hover:text-white hover:bg-white/5'
+                  }`}
+                >
+                  <Stethoscope className="w-3.5 h-3.5 text-teal-400" />
+                  <span>Mtaalamu</span>
+                </button>
 
-              <button
-                type="button"
-                onClick={() => {
-                  setSelectedRoleTab('admin');
-                  setErrorMessage(null);
-                }}
-                className={`flex-1 py-2 px-3 rounded-xl text-xs font-extrabold transition-all flex items-center justify-center gap-1.5 cursor-pointer ${
-                  selectedRoleTab === 'admin'
-                    ? 'bg-white text-slate-900 shadow-md'
-                    : 'text-teal-300 hover:text-white hover:bg-white/5'
-                }`}
-              >
-                <ShieldCheck className="w-3.5 h-3.5 text-teal-400" />
-                <span>Admin</span>
-              </button>
-            </div>
-          )}
+                <button
+                  type="button"
+                  onClick={() => {
+                    setSelectedRoleTab('admin');
+                    setErrorMessage(null);
+                  }}
+                  className={`flex-1 py-2 px-3 rounded-xl text-xs font-extrabold transition-all flex items-center justify-center gap-1.5 cursor-pointer ${
+                    selectedRoleTab === 'admin'
+                      ? 'bg-white text-slate-900 shadow-md'
+                      : 'text-teal-300 hover:text-white hover:bg-white/5'
+                  }`}
+                >
+                  <ShieldCheck className="w-3.5 h-3.5 text-teal-400" />
+                  <span>Admin</span>
+                </button>
+              </div>
+            )}
         </div>
 
         {/* Content Body */}
@@ -510,46 +521,17 @@ export const AuthGateView: React.FC<AuthGateViewProps> = ({
                         <div className="text-xs text-teal-800 font-medium">dismaspokela@gmail.com</div>
                       </div>
                     </div>
-
-                    {onOpenSecuritySettings && (
-                      <button
-                        type="button"
-                        onClick={() => {
-                          const pin = passwordOrPinInput.trim();
-                          const expectedAdminPass = securitySettings.adminPassword || 'admin123';
-                          const expectedAdminPin = securitySettings.adminPin || '8822';
-                          if (!pin || pin === expectedAdminPass || pin === expectedAdminPin || pin === 'admin123' || pin === '8822') {
-                            if (!pin) setPasswordOrPinInput(expectedAdminPin);
-                            onLoginSuccess({
-                              role: 'admin',
-                              username: 'dismaspokela@gmail.com',
-                              name: securitySettings.adminName || 'DISMAS POKELA',
-                              loginTime: new Date().toISOString(),
-                              canPrintReports: true,
-                            });
-                            setTimeout(() => onOpenSecuritySettings(), 150);
-                          } else {
-                            setErrorMessage(`PIN ya Admin si sahihi. Tafadhali ingiza PIN ya Admin (${expectedAdminPin}) au Nenosiri.`);
-                          }
-                        }}
-                        className="px-3 py-1.5 rounded-xl bg-white hover:bg-teal-100/60 border border-teal-300 text-teal-900 text-xs font-bold transition-all shadow-xs flex items-center gap-1.5 cursor-pointer shrink-0"
-                        title="Fungua Mipangilio ya Usalama & Mfumo"
-                      >
-                        <Settings className="w-3.5 h-3.5 text-teal-700" />
-                        <span>⚙️ Mipangilio</span>
-                      </button>
-                    )}
                   </div>
 
-                  {/* Admin PIN / Password Input */}
+                  {/* Admin Password Input */}
                   <div className="space-y-1.5">
                     <div className="flex items-center justify-between">
                       <label className="text-xs font-bold text-slate-800 flex items-center gap-1.5">
                         <KeyRound className="w-4 h-4 text-teal-600" />
-                        <span>PIN ya Kuingia ya Admin (Admin PIN) au Nenosiri:</span>
+                        <span>Nenosiri la Admin (Admin Password):</span>
                       </label>
-                      <span className="text-xs text-teal-700 font-bold">
-                        PIN ya Haraka
+                      <span className="text-xs text-slate-500 font-medium">
+                        Ulinzi wa Mfumo
                       </span>
                     </div>
 
@@ -560,7 +542,7 @@ export const AuthGateView: React.FC<AuthGateViewProps> = ({
                         autoFocus
                         value={passwordOrPinInput}
                         onChange={(e) => setPasswordOrPinInput(e.target.value)}
-                        placeholder={`Ingiza PIN ya Admin (mfano: ${securitySettings.adminPin || '8822'}) au Nenosiri...`}
+                        placeholder="Ingiza Nenosiri lako la Admin..."
                         className="w-full px-4 py-3.5 pr-11 rounded-2xl border-2 border-teal-600/50 focus:border-teal-700 focus:ring-2 focus:ring-teal-500/20 text-slate-900 text-base font-mono font-bold tracking-wider transition-all placeholder:text-slate-400 placeholder:text-sm placeholder:font-sans placeholder:tracking-normal"
                       />
                       <button
@@ -574,7 +556,7 @@ export const AuthGateView: React.FC<AuthGateViewProps> = ({
 
                     <div className="flex items-center justify-between pt-1">
                       <p className="text-xs text-slate-500">
-                        PIN ya msingi ya Admin ni: <strong>{securitySettings.adminPin || '8822'}</strong> (au Nenosiri: <strong>admin123</strong>)
+                        Nenosiri la awali la Admin ni: <strong>admin123</strong> (linaweza kubadilishwa ndani ya mfumo)
                       </p>
 
                       <button
@@ -586,7 +568,7 @@ export const AuthGateView: React.FC<AuthGateViewProps> = ({
                         }}
                         className="text-xs font-bold text-teal-700 hover:text-teal-900 hover:underline cursor-pointer shrink-0"
                       >
-                        Umesahau PIN?
+                        Umesahau Nenosiri?
                       </button>
                     </div>
                   </div>
@@ -596,50 +578,9 @@ export const AuthGateView: React.FC<AuthGateViewProps> = ({
                     type="submit"
                     className="w-full py-3.5 px-4 rounded-2xl bg-teal-800 hover:bg-teal-900 text-white font-extrabold text-sm shadow-md transition-all flex items-center justify-center gap-2 cursor-pointer active:scale-[0.99]"
                   >
-                    <ShieldCheck className="w-4 h-4" />
-                    <span>Thibitisha PIN & Ingia kama Admin</span>
+                    <Lock className="w-4 h-4" />
+                    <span>Thibitisha Nenosiri & Ingia kama Admin</span>
                   </button>
-
-                  {/* Embedded Admin Settings Panel */}
-                  {onOpenSecuritySettings && (
-                    <div className="p-3.5 rounded-2xl bg-slate-50 border border-slate-200/90 flex items-center justify-between gap-3 mt-2">
-                      <div className="space-y-0.5">
-                        <div className="text-xs font-black text-slate-800 flex items-center gap-1.5">
-                          <Sliders className="w-3.5 h-3.5 text-teal-700" />
-                          <span>Mipangilio ya Mfumo (Admin Settings)</span>
-                        </div>
-                        <p className="text-[11px] text-slate-500">
-                          Badili PIN ya Admin, nenosiri, Auto-Lock, na usawazishaji wa mfumo.
-                        </p>
-                      </div>
-
-                      <button
-                        type="button"
-                        onClick={() => {
-                          const pin = passwordOrPinInput.trim();
-                          const expectedAdminPass = securitySettings.adminPassword || 'admin123';
-                          const expectedAdminPin = securitySettings.adminPin || '8822';
-                          if (!pin || pin === expectedAdminPass || pin === expectedAdminPin || pin === 'admin123' || pin === '8822') {
-                            if (!pin) setPasswordOrPinInput(expectedAdminPin);
-                            onLoginSuccess({
-                              role: 'admin',
-                              username: 'dismaspokela@gmail.com',
-                              name: securitySettings.adminName || 'DISMAS POKELA',
-                              loginTime: new Date().toISOString(),
-                              canPrintReports: true,
-                            });
-                            setTimeout(() => onOpenSecuritySettings(), 150);
-                          } else {
-                            setErrorMessage(`PIN ya Admin si sahihi. Tafadhali ingiza PIN ya Admin (${expectedAdminPin}) au Nenosiri.`);
-                          }
-                        }}
-                        className="px-3 py-2 rounded-xl bg-teal-700 hover:bg-teal-800 text-white font-bold text-xs shadow-xs transition-all flex items-center gap-1.5 cursor-pointer shrink-0"
-                      >
-                        <Settings className="w-3.5 h-3.5" />
-                        <span>Fungua Mipangilio (Settings)</span>
-                      </button>
-                    </div>
-                  )}
                 </div>
               ) : (
                 /* ALL ROLES / PATIENT / PRACTITIONER VIEW */

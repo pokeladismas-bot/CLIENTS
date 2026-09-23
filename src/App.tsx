@@ -34,8 +34,15 @@ import { ThemeSwitcherModal } from './components/ThemeSwitcherModal';
 import { AuthGateView } from './components/AuthGateView';
 import { AppInstallerModal } from './components/AppInstallerModal';
 import { ClinicalSecuritySettingsModal } from './components/ClinicalSecuritySettingsModal';
+import { ChangePasswordModal } from './components/ChangePasswordModal';
 import { SystemDataSyncBar } from './components/SystemDataSyncBar';
-import { performFullSystemSync } from './services/dataSyncService';
+import { 
+  performFullSystemSync, 
+  subscribeToLiveCloudUpdates,
+  updateAdminPasswordCloud,
+  updateDoctorPasswordCloud,
+  updatePatientPasswordCloud 
+} from './services/dataSyncService';
 import { DASHBOARD_THEMES, getSavedTheme, saveTheme } from './utils/theme';
 import { testFirestoreConnection } from './services/firebase';
 import { 
@@ -72,8 +79,8 @@ const DEFAULT_SECURITY_SETTINGS: SecuritySettings = {
   adminEmail: 'dismaspokela@gmail.com',
   allowPatientPrinting: true,
   requireAdminApprovalForExport: false,
-  requireLoginFirst: true,
-  autoLockMinutes: 10,
+  requireLoginFirst: false, // Ruhusu mfumo kutumika moja kwa moja bila kizuizi
+  autoLockMinutes: 0,
   autoSyncEnabled: true,
   syncIntervalSeconds: 30,
 };
@@ -147,21 +154,47 @@ export default function App() {
 
   // Security & Authentication State
   const [securitySettings, setSecuritySettings] = useState<SecuritySettings>(() => {
+    const customAdminPass = typeof window !== 'undefined' ? localStorage.getItem('afyalishe_custom_admin_password') : null;
     const saved = localStorage.getItem('afyalishe_security_settings');
-    return saved ? JSON.parse(saved) : DEFAULT_SECURITY_SETTINGS;
+    if (saved) {
+      try {
+        const parsed = JSON.parse(saved);
+        return {
+          ...DEFAULT_SECURITY_SETTINGS,
+          ...parsed,
+          adminPassword: (customAdminPass && customAdminPass !== 'admin123') ? customAdminPass : (parsed.adminPassword || DEFAULT_SECURITY_SETTINGS.adminPassword),
+          requireLoginFirst: false, // Ruhusu mfumo kutumika moja kwa moja
+        };
+      } catch {
+        // fallback
+      }
+    }
+    return {
+      ...DEFAULT_SECURITY_SETTINGS,
+      adminPassword: (customAdminPass && customAdminPass !== 'admin123') ? customAdminPass : DEFAULT_SECURITY_SETTINGS.adminPassword,
+    };
   });
 
   const [authSession, setAuthSession] = useState<AuthSession | null>(() => {
     const saved = localStorage.getItem('afyalishe_auth_session');
     if (saved) {
       try {
-        return JSON.parse(saved);
+        const parsed = JSON.parse(saved);
+        if (parsed && parsed.role) return parsed;
       } catch {
-        return null;
+        // continue
       }
     }
-    // If requireLoginFirst is enabled, require password by starting unauthenticated
-    return null;
+    // Ruhusu mfumo kutumika mara moja: weka kikao cha Admin DISMAS POKELA
+    const defaultSession: AuthSession = {
+      role: 'admin',
+      username: 'dismaspokela@gmail.com',
+      name: 'DISMAS POKELA',
+      loginTime: new Date().toISOString(),
+      canPrintReports: true,
+    };
+    localStorage.setItem('afyalishe_auth_session', JSON.stringify(defaultSession));
+    return defaultSession;
   });
 
   const [isAuthModalOpen, setIsAuthModalOpen] = useState<boolean>(false);
@@ -174,6 +207,7 @@ export default function App() {
   // PWA App Installer Modal State (Admin & Practitioner installation system)
   const [isInstallerModalOpen, setIsInstallerModalOpen] = useState<boolean>(false);
   const [isSecuritySettingsModalOpen, setIsSecuritySettingsModalOpen] = useState<boolean>(false);
+  const [isChangePasswordModalOpen, setIsChangePasswordModalOpen] = useState<boolean>(false);
   const [systemLockNotice, setSystemLockNotice] = useState<string | null>(null);
 
   const handleSelectTheme = (theme: DashboardTheme) => {
@@ -218,24 +252,44 @@ export default function App() {
     );
   };
 
-  const handleUpdateDoctorPassword = (doctorId: string, newPassword: string) => {
-    setDoctors((prev) =>
-      prev.map((d) =>
-        d.id === doctorId
-          ? { ...d, password: newPassword, isPasswordChanged: true }
-          : d
-      )
+  const handleUpdateDoctorPassword = async (doctorId: string, newPassword: string) => {
+    const next = doctors.map((d) =>
+      d.id === doctorId
+        ? { ...d, password: newPassword, isPasswordChanged: true }
+        : d
     );
+    setDoctors(next);
+    localStorage.setItem('afyalishe_online_doctors', JSON.stringify(next));
+    await updateDoctorPasswordCloud(doctorId, newPassword, next);
+    setTimeout(() => {
+      performDataSync(false);
+    }, 100);
   };
 
-  const handleUpdatePatientPassword = (patientId: string, newPassword: string) => {
-    setPatients((prev) =>
-      prev.map((p) => (p.id === patientId ? { ...p, password: newPassword } : p))
-    );
+  const handleUpdatePatientPassword = async (patientId: string, newPassword: string) => {
+    const next = patients.map((p) => (p.id === patientId ? { ...p, password: newPassword } : p));
+    setPatients(next);
+    localStorage.setItem('afyalishe_patients', JSON.stringify(next));
+    await updatePatientPasswordCloud(patientId, newPassword, next);
+    setTimeout(() => {
+      performDataSync(false);
+    }, 100);
   };
 
-  const handleUpdateAdminPassword = (newPassword: string) => {
-    setSecuritySettings((prev) => ({ ...prev, adminPassword: newPassword }));
+  const handleUpdateAdminPassword = async (newPassword: string) => {
+    try {
+      localStorage.setItem('afyalishe_custom_admin_password', newPassword);
+    } catch {}
+    setSecuritySettings((prev) => {
+      const next = { ...prev, adminPassword: newPassword };
+      localStorage.setItem('afyalishe_security_settings', JSON.stringify(next));
+      return next;
+    });
+    // Immediately persist and accept new admin password in Firestore & localStorage
+    await updateAdminPasswordCloud(newPassword);
+    setTimeout(() => {
+      performDataSync(false);
+    }, 100);
   };
 
   // Sync to local storage
@@ -591,17 +645,101 @@ export default function App() {
       });
       setLastSyncedTimeStr(formattedTime);
 
-      setSecuritySettings((prev) => {
-        const next = { ...prev, lastSyncedAt: formattedTime };
-        localStorage.setItem('afyalishe_security_settings', JSON.stringify(next));
-        return next;
-      });
+      // Adopt merged updates from cloud for multi-device sync
+      if (result.updatedPatients && result.updatedPatients.length > 0) {
+        setPatients(result.updatedPatients);
+        localStorage.setItem('afyalishe_patients', JSON.stringify(result.updatedPatients));
+      }
+      if (result.updatedDoctors && result.updatedDoctors.length > 0) {
+        setDoctors(result.updatedDoctors);
+      }
+      if (result.updatedSettings) {
+        setSecuritySettings((prev) => {
+          let customPass = '';
+          try {
+            customPass = (localStorage.getItem('afyalishe_custom_admin_password') || '').trim();
+          } catch {}
+          const effectivePass = (customPass && customPass !== 'admin123')
+            ? customPass
+            : (result.updatedSettings?.adminPassword || prev.adminPassword || 'admin123');
+          const next = {
+            ...result.updatedSettings,
+            adminPassword: effectivePass,
+          };
+          localStorage.setItem('afyalishe_security_settings', JSON.stringify(next));
+          return next;
+        });
+      }
+      if (result.updatedGlucose && result.updatedGlucose.length > 0) {
+        setGlucoseLogs(result.updatedGlucose);
+        localStorage.setItem('afyalishe_glucose', JSON.stringify(result.updatedGlucose));
+      }
+      if (result.updatedMeals && result.updatedMeals.length > 0) {
+        setMeals(result.updatedMeals);
+        localStorage.setItem('afyalishe_meals', JSON.stringify(result.updatedMeals));
+      }
     } catch (err) {
       console.warn('Periodic sync notice:', err);
     } finally {
       setIsSystemSyncing(false);
     }
   };
+
+  // Real-time Cloud Sync Listener across ALL devices (Firebase onSnapshot)
+  useEffect(() => {
+    const isAutoSync = securitySettings.autoSyncEnabled ?? true;
+    if (!isAutoSync) return;
+
+    const unsubscribe = subscribeToLiveCloudUpdates((cloudData) => {
+      if (cloudData.settings) {
+        setSecuritySettings((prev) => {
+          let customPass = '';
+          try {
+            customPass = (localStorage.getItem('afyalishe_custom_admin_password') || '').trim();
+          } catch {}
+          const cloudPass = (cloudData.settings?.adminPassword || '').trim();
+          
+          let effectivePass = prev.adminPassword || 'admin123';
+          if (customPass && customPass !== 'admin123') {
+            effectivePass = customPass;
+          } else if (cloudPass && cloudPass !== 'admin123') {
+            effectivePass = cloudPass;
+          } else if (prev.adminPassword && prev.adminPassword !== 'admin123') {
+            effectivePass = prev.adminPassword;
+          }
+
+          const next = {
+            ...cloudData.settings,
+            ...prev,
+            adminPassword: effectivePass,
+          };
+          localStorage.setItem('afyalishe_security_settings', JSON.stringify(next));
+          return next;
+        });
+      }
+      if (cloudData.patients && cloudData.patients.length > 0) {
+        setPatients(cloudData.patients);
+        localStorage.setItem('afyalishe_patients', JSON.stringify(cloudData.patients));
+      }
+      if (cloudData.doctors && cloudData.doctors.length > 0) {
+        setDoctors(cloudData.doctors);
+      }
+      if (cloudData.glucoseLogs && cloudData.glucoseLogs.length > 0) {
+        setGlucoseLogs(cloudData.glucoseLogs);
+        localStorage.setItem('afyalishe_glucose', JSON.stringify(cloudData.glucoseLogs));
+      }
+      if (cloudData.meals && cloudData.meals.length > 0) {
+        setMeals(cloudData.meals);
+        localStorage.setItem('afyalishe_meals', JSON.stringify(cloudData.meals));
+      }
+      const now = new Date();
+      setLastSyncedTimeStr(now.toLocaleTimeString('sw-TZ', { hour: '2-digit', minute: '2-digit', second: '2-digit' }));
+    });
+
+    return () => {
+      unsubscribe();
+    };
+  }, [securitySettings.autoSyncEnabled]);
 
   // Periodic timer for continuous update
   useEffect(() => {
@@ -653,9 +791,8 @@ export default function App() {
 
   const activeTheme = DASHBOARD_THEMES[currentTheme] || DASHBOARD_THEMES.emerald;
 
-  // STRICT MANDATORY ROLE AUTHENTICATION GATE
-  // If user is not authenticated with a valid role password, the dashboard CANNOT be accessed!
-  if (!authSession) {
+  // ROLE AUTHENTICATION GATE (Only activated if explicitly enabled in Security Settings)
+  if (securitySettings.requireLoginFirst && !authSession) {
     return (
       <div className={`min-h-screen ${activeTheme.pageBg} flex flex-col justify-center items-center p-4 sm:p-6 transition-colors duration-200 font-sans selection:bg-emerald-500 selection:text-white`}>
         <AuthGateView
@@ -664,28 +801,10 @@ export default function App() {
           securitySettings={securitySettings}
           onLoginSuccess={handleLoginSuccess}
           currentTheme={currentTheme}
-          onOpenThemeModal={() => setIsThemeModalOpen(true)}
-          onOpenSecuritySettings={() => setIsSecuritySettingsModalOpen(true)}
           onUpdatePatientPassword={handleUpdatePatientPassword}
           onUpdateDoctorPassword={handleUpdateDoctorPassword}
           onUpdateAdminPassword={handleUpdateAdminPassword}
           lockedNotice={systemLockNotice}
-        />
-
-        {/* Theme Switcher Modal Accessible on Gate */}
-        <ThemeSwitcherModal
-          isOpen={isThemeModalOpen}
-          onClose={() => setIsThemeModalOpen(false)}
-          currentTheme={currentTheme}
-          onSelectTheme={handleSelectTheme}
-        />
-
-        {/* Clinical Security Settings Modal Accessible by Admin */}
-        <ClinicalSecuritySettingsModal
-          isOpen={isSecuritySettingsModalOpen}
-          onClose={() => setIsSecuritySettingsModalOpen(false)}
-          securitySettings={securitySettings}
-          onUpdateSecuritySettings={setSecuritySettings}
         />
       </div>
     );
@@ -738,6 +857,7 @@ export default function App() {
         onOpenThemeModal={() => setIsThemeModalOpen(true)}
         onOpenInstallerModal={() => setIsInstallerModalOpen(true)}
         onOpenSecuritySettings={() => setIsSecuritySettingsModalOpen(true)}
+        onOpenChangePasswordModal={() => setIsChangePasswordModalOpen(true)}
         onOpenAdminBackupModal={() => setIsDriveModalOpen(true)}
       />
 
@@ -774,6 +894,7 @@ export default function App() {
             onOpenAdminPractitionersModal={() => setIsAdminPractitionersModalOpen(true)}
             onOpenInstallerModal={() => setIsInstallerModalOpen(true)}
             onOpenSecuritySettings={() => setIsSecuritySettingsModalOpen(true)}
+            onOpenChangePassword={() => setIsChangePasswordModalOpen(true)}
             onOpenAdminBackupModal={() => setIsDriveModalOpen(true)}
             onOpenPrintReport={(glucoseVal) => {
               const fakeLog: GlucoseLog = {
@@ -1080,9 +1201,31 @@ export default function App() {
         isOpen={isSecuritySettingsModalOpen}
         onClose={() => setIsSecuritySettingsModalOpen(false)}
         securitySettings={securitySettings}
-        onUpdateSecuritySettings={(updated) => setSecuritySettings(updated)}
+        onUpdateSecuritySettings={(updated) => {
+          setSecuritySettings(updated);
+          localStorage.setItem('afyalishe_security_settings', JSON.stringify(updated));
+        }}
+        patients={patients}
+        doctors={doctors}
+        onUpdatePatientPassword={handleUpdatePatientPassword}
+        onUpdateDoctorPassword={handleUpdateDoctorPassword}
+        onTriggerCloudSync={() => performDataSync(false)}
+        isSyncing={isSystemSyncing}
+        lastSyncedTime={lastSyncedTimeStr}
       />
 
+      {/* Change Password Modal (Reachable once logged into the system) */}
+      <ChangePasswordModal
+        isOpen={isChangePasswordModalOpen}
+        onClose={() => setIsChangePasswordModalOpen(false)}
+        authSession={authSession}
+        securitySettings={securitySettings}
+        doctors={doctors}
+        patients={patients}
+        onUpdateAdminPassword={handleUpdateAdminPassword}
+        onUpdateDoctorPassword={handleUpdateDoctorPassword}
+        onUpdatePatientPassword={handleUpdatePatientPassword}
+      />
 
       {/* In-App Active Reminder Alert Toast */}
       {isReminderAlertVisible && (

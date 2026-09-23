@@ -1,7 +1,8 @@
 import React, { useState } from 'react';
 import { 
   RefreshCw, ShieldCheck, Database, CheckCircle2, Lock, 
-  ArrowRight, Flame, Layers, Clock, Radio, ChevronDown, ChevronUp
+  ArrowRight, Flame, Layers, Clock, Radio, ChevronDown, ChevronUp,
+  KeyRound
 } from 'lucide-react';
 
 interface SystemDataSyncBarProps {
@@ -36,7 +37,15 @@ export const SystemDataSyncBar: React.FC<SystemDataSyncBarProps> = ({
           <div className="flex items-center gap-1.5 font-black text-teal-400 bg-teal-950/70 border border-teal-800/80 px-2 py-0.5 rounded-full">
             <span className="w-2 h-2 rounded-full bg-teal-400 animate-ping inline-block" />
             <Radio className="w-3 h-3 text-teal-300" />
-            <span>Usasishaji wa Data (Live Data Pipeline)</span>
+            <span>Usawazishaji wa Vifaa Vyote (Multi-Device Live Sync)</span>
+          </div>
+
+          <div className="hidden sm:flex items-center gap-1.5 px-2 py-0.5 rounded-md bg-cyan-950/80 border border-cyan-800/60 text-cyan-300 font-bold text-[10px]">
+            <span>📱 Simu</span>
+            <span>•</span>
+            <span>💻 Kompyuta</span>
+            <span>•</span>
+            <span>📟 Tablet</span>
           </div>
 
           <div className="hidden lg:flex items-center gap-1 font-mono text-[11px] text-slate-300 bg-slate-800/60 px-2.5 py-0.5 rounded-lg border border-slate-700/60">
@@ -88,11 +97,11 @@ export const SystemDataSyncBar: React.FC<SystemDataSyncBarProps> = ({
             type="button"
             onClick={onManualSync}
             disabled={isSyncing}
-            className="px-2.5 py-1 rounded-lg bg-teal-600 hover:bg-teal-500 disabled:bg-slate-700 text-slate-950 font-black text-[11px] flex items-center gap-1.5 transition-all shadow-xs cursor-pointer active:scale-95"
-            title="Bofya kusasisha taarifa zote kutoka Firebase kwenda kwenye mfumo"
+            className="px-2.5 py-1 rounded-lg bg-teal-500 hover:bg-teal-400 disabled:bg-slate-700 text-slate-950 font-black text-[11px] flex items-center gap-1.5 transition-all shadow-xs cursor-pointer active:scale-95"
+            title="Bofya kusasisha taarifa zote kutoka Firebase kwenda kwenye vifaa vyote vinavyotumia mfumo"
           >
             <RefreshCw className={`w-3 h-3 ${isSyncing ? 'animate-spin text-slate-950' : 'text-slate-950'}`} />
-            <span>{isSyncing ? 'Inasasisha...' : '🔄 Sasisha Sasa'}</span>
+            <span>{isSyncing ? 'Inasasisha...' : '🔄 Sasisha Vifaa Vyote'}</span>
           </button>
 
           {/* Quick Lock Screen Button */}

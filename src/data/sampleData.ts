@@ -13,11 +13,15 @@ import {
 
 export const INITIAL_SECURITY_SETTINGS: SecuritySettings = {
   adminPassword: 'admin123',
+  adminPin: '8822',
   adminName: 'DISMAS POKELA',
   adminEmail: 'dismaspokela@gmail.com',
-  allowPatientPrinting: false, // Default is locked by admin; admin can toggle globally or per patient
-  requireAdminApprovalForExport: true,
-  requireLoginFirst: true,
+  allowPatientPrinting: true, // Ruhusu wagonjwa kuchapisha ripoti
+  requireAdminApprovalForExport: false,
+  requireLoginFirst: false, // Mfumo unaruhusiwa kutumika moja kwa moja
+  autoLockMinutes: 0, // Mfumo haujifungi kiotomatiki ili kuruhusu matumizi mepesi
+  autoSyncEnabled: true,
+  syncIntervalSeconds: 30,
 };
 
 export const INITIAL_USER_PROFILE: UserProfile = {

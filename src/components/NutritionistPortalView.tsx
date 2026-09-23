@@ -30,6 +30,7 @@ interface NutritionistPortalViewProps {
   onOpenAdminBackupModal?: () => void;
   onOpenInstallerModal?: () => void;
   onOpenSecuritySettings?: () => void;
+  onOpenChangePassword?: () => void;
 }
 
 export const NutritionistPortalView: React.FC<NutritionistPortalViewProps> = ({
@@ -47,6 +48,7 @@ export const NutritionistPortalView: React.FC<NutritionistPortalViewProps> = ({
   onOpenAdminBackupModal,
   onOpenInstallerModal,
   onOpenSecuritySettings,
+  onOpenChangePassword,
 }) => {
   const [selectedPatientId, setSelectedPatientId] = useState<string>(patients[0]?.id || '');
   const [filterCategory, setFilterCategory] = useState<string>('all');
@@ -213,6 +215,18 @@ export const NutritionistPortalView: React.FC<NutritionistPortalViewProps> = ({
         </div>
 
         <div className="flex flex-wrap items-center gap-3 w-full md:w-auto">
+
+          {onOpenChangePassword && (
+            <button
+              type="button"
+              onClick={onOpenChangePassword}
+              className="flex-1 md:flex-initial px-4 py-3 rounded-2xl bg-emerald-700 hover:bg-emerald-600 text-white font-extrabold text-sm shadow-md border border-emerald-500/40 transition-all flex items-center justify-center gap-2 cursor-pointer active:scale-98"
+              title="Badilisha Nenosiri Lako la Kuingilia Mfumo"
+            >
+              <KeyRound className="w-4 h-4 text-emerald-200" />
+              <span>🔑 Badilisha Nenosiri</span>
+            </button>
+          )}
 
           {onOpenSecuritySettings && (
             <button
