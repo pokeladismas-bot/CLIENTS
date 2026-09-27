@@ -2,11 +2,13 @@ import React, { useState, useEffect } from 'react';
 import { 
   Sparkles, HeartPulse, ArrowRight, AlertTriangle, CheckCircle2, 
   RefreshCw, Utensils, Droplets, ShieldAlert, ChevronRight, Apple, 
-  Flame, BookOpen, Coffee, Sun, Moon, Printer, FileDown, Image
+  Flame, BookOpen, Coffee, Sun, Moon, Printer, FileDown, Image,
+  MapPin, Compass
 } from 'lucide-react';
 import confetti from 'canvas-confetti';
 import { DietaryRecommendationItem, GlucoseLog, GlucoseRecommendationResponse, MealLog, UserProfile } from '../types';
 import { PrintDietaryReportModal } from './PrintDietaryReportModal';
+import { TANZANIA_REGIONS, getDistrictsForRegion, getRegionInfo } from '../data/tanzaniaRegions';
 
 interface DietaryRecommendationsViewProps {
   latestGlucose?: GlucoseLog;
@@ -25,6 +27,8 @@ export const DietaryRecommendationsView: React.FC<DietaryRecommendationsViewProp
 }) => {
   const [testedGlucose, setTestedGlucose] = useState<number>(latestGlucose ? latestGlucose.value : 115);
   const [testedTiming, setTestedTiming] = useState<string>(latestGlucose ? latestGlucose.timing : 'fasting');
+  const [selectedRegion, setSelectedRegion] = useState<string>(profile.region || 'Dar es Salaam');
+  const [selectedDistrict, setSelectedDistrict] = useState<string>(profile.district || 'Kinondoni');
   const [isLoading, setIsLoading] = useState<boolean>(false);
   const [error, setError] = useState<string | null>(null);
   const [recommendation, setRecommendation] = useState<GlucoseRecommendationResponse | null>(null);
@@ -34,12 +38,19 @@ export const DietaryRecommendationsView: React.FC<DietaryRecommendationsViewProp
 
   // Load recommendations when tested glucose changes
   useEffect(() => {
-    fetchRecommendations(testedGlucose, testedTiming);
+    fetchRecommendations(testedGlucose, testedTiming, selectedRegion, selectedDistrict);
   }, []);
 
-  const fetchRecommendations = async (glucoseVal: number, timingVal: string) => {
+  const fetchRecommendations = async (glucoseVal: number, timingVal: string, regVal?: string, distVal?: string) => {
     setIsLoading(true);
     setError(null);
+    const activeRegion = regVal || selectedRegion;
+    const activeDistrict = distVal || selectedDistrict;
+    const regInfo = getRegionInfo(activeRegion);
+    const localFoodsDescription = regInfo 
+      ? `Vyakula vya asili vya Mkoa wa ${activeRegion} (${activeDistrict}): Nafaka (${regInfo.commonStaples.join(', ')}), Mboga (${regInfo.commonVegetables.join(', ')}), Protini (${regInfo.commonProteins.join(', ')}). ${regInfo.dietaryAdviceSummary}`
+      : customPreference;
+
     try {
       const res = await fetch('/api/recommend-diet', {
         method: 'POST',
@@ -49,7 +60,10 @@ export const DietaryRecommendationsView: React.FC<DietaryRecommendationsViewProp
           timing: timingVal,
           diabetesType: profile.diabetesType,
           recentMeals: recentMeals.slice(0, 3),
-          userPreferences: customPreference,
+          userPreferences: `${customPreference}. ${localFoodsDescription}`,
+          region: activeRegion,
+          district: activeDistrict,
+          location: `${activeDistrict}, ${activeRegion}`,
         }),
       });
 
@@ -209,7 +223,126 @@ export const DietaryRecommendationsView: React.FC<DietaryRecommendationsViewProp
         </div>
       </div>
 
-      {/* Loading state */}
+      {/* Eneo la Kijiografia na Vyakula Vinavyopatikana Mkoani & Wilayani */}
+      {(() => {
+        const currentRegionData = getRegionInfo(selectedRegion);
+        return (
+          <div className="bg-white rounded-3xl p-5 sm:p-6 border border-teal-200/80 shadow-md space-y-4">
+            <div className="flex flex-col md:flex-row md:items-center justify-between gap-3 border-b border-slate-100 pb-3">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-2xl bg-teal-50 border border-teal-200 text-teal-700 flex items-center justify-center shrink-0">
+                  <MapPin className="w-5 h-5 text-teal-600" />
+                </div>
+                <div>
+                  <div className="flex items-center gap-2">
+                    <h3 className="font-black text-slate-900 text-base sm:text-lg">
+                      Vyakula vya Asili Vinavyopatikana: Mkoa wa {selectedRegion}
+                    </h3>
+                    <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-teal-100 text-teal-800">
+                      Wilaya ya {selectedDistrict}
+                    </span>
+                  </div>
+                  <p className="text-xs text-slate-500">
+                    Ushauri wa lishe unaobadilika kulingana na mazingira na mazao yanayopatikana sokoni na mashambani kwako.
+                  </p>
+                </div>
+              </div>
+
+              {/* Region & District Quick Selector */}
+              <div className="flex items-center gap-2 flex-wrap">
+                <div className="flex items-center gap-1.5 bg-slate-50 px-2.5 py-1.5 rounded-xl border border-slate-200">
+                  <MapPin className="w-3.5 h-3.5 text-teal-600" />
+                  <select
+                    value={selectedRegion}
+                    onChange={(e) => {
+                      const newReg = e.target.value;
+                      setSelectedRegion(newReg);
+                      const dists = getDistrictsForRegion(newReg);
+                      const newDist = dists[0] || '';
+                      setSelectedDistrict(newDist);
+                      fetchRecommendations(testedGlucose, testedTiming, newReg, newDist);
+                    }}
+                    className="bg-transparent text-xs font-bold text-slate-800 focus:outline-none cursor-pointer"
+                  >
+                    {TANZANIA_REGIONS.map((r) => (
+                      <option key={r.name} value={r.name}>
+                        {r.name}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                <div className="flex items-center gap-1.5 bg-slate-50 px-2.5 py-1.5 rounded-xl border border-slate-200">
+                  <Compass className="w-3.5 h-3.5 text-teal-600" />
+                  <select
+                    value={selectedDistrict}
+                    onChange={(e) => {
+                      const newDist = e.target.value;
+                      setSelectedDistrict(newDist);
+                      fetchRecommendations(testedGlucose, testedTiming, selectedRegion, newDist);
+                    }}
+                    className="bg-transparent text-xs font-bold text-slate-800 focus:outline-none cursor-pointer"
+                  >
+                    {getDistrictsForRegion(selectedRegion).map((dist) => (
+                      <option key={dist} value={dist}>
+                        Wilaya ya {dist}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                <button
+                  type="button"
+                  onClick={() => fetchRecommendations(testedGlucose, testedTiming, selectedRegion, selectedDistrict)}
+                  className="px-3 py-1.5 rounded-xl bg-teal-600 hover:bg-teal-700 text-white font-bold text-xs flex items-center gap-1.5 transition-all shadow-xs cursor-pointer active:scale-95"
+                  title="Sasisha mapendekezo kulingana na eneo hili"
+                >
+                  <RefreshCw className={`w-3.5 h-3.5 ${isLoading ? 'animate-spin' : ''}`} />
+                  <span>Sasisha Eneo</span>
+                </button>
+              </div>
+            </div>
+
+            {currentRegionData && (
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-3 text-xs">
+                <div className="p-3 rounded-2xl bg-amber-50/70 border border-amber-200/80 space-y-1">
+                  <span className="font-bold text-amber-900 flex items-center gap-1">
+                    <span>🌾 Nafaka & Mizizi ya {currentRegionData.name}:</span>
+                  </span>
+                  <p className="text-[11px] text-amber-950 font-medium">
+                    {currentRegionData.commonStaples.join(' • ')}
+                  </p>
+                </div>
+
+                <div className="p-3 rounded-2xl bg-emerald-50/70 border border-emerald-200/80 space-y-1">
+                  <span className="font-bold text-emerald-900 flex items-center gap-1">
+                    <span>🥬 Mboga za Majani za Asili:</span>
+                  </span>
+                  <p className="text-[11px] text-emerald-950 font-medium">
+                    {currentRegionData.commonVegetables.join(' • ')}
+                  </p>
+                </div>
+
+                <div className="p-3 rounded-2xl bg-blue-50/70 border border-blue-200/80 space-y-1">
+                  <span className="font-bold text-blue-900 flex items-center gap-1">
+                    <span>🐟 Protini Inayopatikana Wilayani:</span>
+                  </span>
+                  <p className="text-[11px] text-blue-950 font-medium">
+                    {currentRegionData.commonProteins.join(' • ')}
+                  </p>
+                </div>
+
+                <div className="md:col-span-3 p-3 rounded-2xl bg-teal-950 text-teal-100 text-[11px] flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                  <div className="flex items-center gap-2">
+                    <Utensils className="w-4 h-4 text-teal-300 shrink-0" />
+                    <span><strong>Ushauri Maalum wa Kilishe {currentRegionData.name}:</strong> {currentRegionData.dietaryAdviceSummary}</span>
+                  </div>
+                </div>
+              </div>
+            )}
+          </div>
+        );
+      })()}
       {isLoading && (
         <div className="py-16 text-center space-y-3">
           <div className="w-12 h-12 rounded-full border-4 border-emerald-200 border-t-emerald-600 animate-spin mx-auto" />

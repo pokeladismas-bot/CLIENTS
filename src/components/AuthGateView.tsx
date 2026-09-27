@@ -9,6 +9,8 @@ import {
 import { AuthSession, DashboardTheme, OnlineDoctor, RegisteredPatient, SecuritySettings, UserRole } from '../types';
 import { signInWithGoogleAuth } from '../services/firebase';
 import { DASHBOARD_THEMES } from '../utils/theme';
+import { validatePasswordComplexity } from '../utils/passwordValidator';
+import { PasswordComplexityIndicator } from './PasswordComplexityIndicator';
 
 interface AuthGateViewProps {
   patients: RegisteredPatient[];
@@ -68,6 +70,11 @@ export const AuthGateView: React.FC<AuthGateViewProps> = ({
   const [confirmResetPassword, setConfirmResetPassword] = useState('');
   const [showNewResetPass, setShowNewResetPass] = useState(false);
   const [resetCompletedMessage, setResetCompletedMessage] = useState<string | null>(null);
+
+  // Real-time password complexity evaluation
+  const resetPassComplexity = validatePasswordComplexity(newResetPassword);
+  const resetPassMatch = confirmResetPassword.length > 0 && newResetPassword === confirmResetPassword;
+  const resetPassMismatch = confirmResetPassword.length > 0 && newResetPassword !== confirmResetPassword;
 
   // Universal Authentication Handler
   const handleLoginSubmit = (e: React.FormEvent) => {
@@ -309,12 +316,16 @@ export const AuthGateView: React.FC<AuthGateViewProps> = ({
     const p2 = confirmResetPassword.trim();
 
     if (!p1) {
-      setResetErrorMessage('Tafadhali ingiza PIN au Nenosiri jipya.');
+      setResetErrorMessage('Tafadhali ingiza Nenosiri jipya.');
       return;
     }
 
-    if (p1.length < 3) {
-      setResetErrorMessage('PIN au Nenosiri lazima liwe na angalau herufi au tarakimu 3.');
+    const complexity = validatePasswordComplexity(p1);
+    if (!complexity.isValid) {
+      setResetErrorMessage(
+        complexity.errorMessage ||
+        'Nenosiri jipya lazima liwe na angalau herufi 8, namba moja (0-9), na herufi kubwa moja (A-Z).'
+      );
       return;
     }
 
@@ -789,10 +800,15 @@ export const AuthGateView: React.FC<AuthGateViewProps> = ({
 
                   {/* Set New Password Form */}
                   <form onSubmit={handleApplyInteractiveReset} className="space-y-3 pt-2">
-                    <div className="space-y-1">
-                      <label className="text-xs font-bold text-slate-700">
-                        Weka PIN au Nenosiri Jipya
-                      </label>
+                    <div className="space-y-1.5">
+                      <div className="flex items-center justify-between">
+                        <label className="text-xs font-bold text-slate-700">
+                          Weka Nenosiri Jipya:
+                        </label>
+                        <span className="text-[10px] text-slate-500 font-medium">
+                          Vigezo 3 vya usalama
+                        </span>
+                      </div>
                       <div className="relative">
                         <input
                           type={showNewResetPass ? 'text' : 'password'}
@@ -800,7 +816,13 @@ export const AuthGateView: React.FC<AuthGateViewProps> = ({
                           value={newResetPassword}
                           onChange={(e) => setNewResetPassword(e.target.value)}
                           placeholder="Ingiza nenosiri jipya..."
-                          className="w-full pl-3 pr-10 py-2.5 rounded-xl border border-slate-300 text-sm font-medium focus:border-emerald-600 focus:ring-2 focus:ring-emerald-500/20"
+                          className={`w-full pl-3 pr-10 py-2.5 rounded-xl border text-sm font-medium focus:outline-none focus:ring-2 transition-all ${
+                            resetPassComplexity.isValid
+                              ? 'border-emerald-500 focus:border-emerald-600 focus:ring-emerald-500/20'
+                              : newResetPassword.length > 0
+                              ? 'border-amber-400 focus:border-amber-500 focus:ring-amber-500/20'
+                              : 'border-slate-300 focus:border-emerald-600 focus:ring-emerald-500/20'
+                          }`}
                         />
                         <button
                           type="button"
@@ -810,25 +832,47 @@ export const AuthGateView: React.FC<AuthGateViewProps> = ({
                           {showNewResetPass ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
                         </button>
                       </div>
+
+                      {/* Real-time Password Complexity Indicator */}
+                      <PasswordComplexityIndicator password={newResetPassword} showAlways={true} />
                     </div>
 
                     <div className="space-y-1">
-                      <label className="text-xs font-bold text-slate-700">
-                        Rudia Nenosiri Jipya
-                      </label>
+                      <div className="flex items-center justify-between">
+                        <label className="text-xs font-bold text-slate-700">
+                          Rudia Nenosiri Jipya:
+                        </label>
+                        {resetPassMatch && (
+                          <span className="text-[10px] font-bold text-emerald-700 flex items-center gap-1">
+                            <Check className="w-3 h-3" /> Linafanana
+                          </span>
+                        )}
+                        {resetPassMismatch && (
+                          <span className="text-[10px] font-bold text-rose-600 flex items-center gap-1">
+                            <AlertCircle className="w-3 h-3" /> Hayafanani
+                          </span>
+                        )}
+                      </div>
                       <input
                         type={showNewResetPass ? 'text' : 'password'}
                         required
                         value={confirmResetPassword}
                         onChange={(e) => setConfirmResetPassword(e.target.value)}
                         placeholder="Rudia nenosiri jipya kuthibitisha..."
-                        className="w-full px-3 py-2.5 rounded-xl border border-slate-300 text-sm font-medium focus:border-emerald-600 focus:ring-2 focus:ring-emerald-500/20"
+                        className={`w-full px-3 py-2.5 rounded-xl border text-sm font-medium focus:outline-none focus:ring-2 transition-all ${
+                          resetPassMatch
+                            ? 'border-emerald-500 focus:border-emerald-600 focus:ring-emerald-500/20'
+                            : resetPassMismatch
+                            ? 'border-rose-400 focus:border-rose-500 focus:ring-rose-500/20'
+                            : 'border-slate-300 focus:border-emerald-600 focus:ring-emerald-500/20'
+                        }`}
                       />
                     </div>
 
                     <button
                       type="submit"
-                      className={`w-full py-3 px-4 rounded-xl ${activeTheme.primaryButton} font-bold text-sm shadow-md transition-all flex items-center justify-center gap-2 cursor-pointer mt-2`}
+                      disabled={!resetPassComplexity.isValid || (confirmResetPassword.length > 0 && newResetPassword !== confirmResetPassword)}
+                      className={`w-full py-3 px-4 rounded-xl ${activeTheme.primaryButton} font-bold text-sm shadow-md transition-all flex items-center justify-center gap-2 cursor-pointer mt-2 disabled:opacity-50 disabled:cursor-not-allowed`}
                     >
                       <Check className="w-4 h-4" />
                       <span>Hifadhi Nenosiri Jipya & Ingia Moja kwa Moja</span>

@@ -4,7 +4,7 @@ import {
   Calendar, FileText, Printer, CheckCircle2, ChevronRight, PlusCircle, 
   Sparkles, AlertCircle, ArrowUpRight, Clock, MapPin, Phone, ShieldAlert,
   Edit3, Trash2, Lock, KeyRound, ShieldCheck, Eye, EyeOff, Shield, Check,
-  Baby, Send, Database, Download, Smartphone
+  Baby, Send, Database, Download, Smartphone, Utensils
 } from 'lucide-react';
 import { 
   ClientCategory, RegisteredPatient, NutritionistPrescription, 
@@ -14,6 +14,7 @@ import { EditPatientModal } from './EditPatientModal';
 import { PatientReferralModal } from './PatientReferralModal';
 import { PatientAIAnalysisModal } from './PatientAIAnalysisModal';
 import { ChildNutritionTrackerView } from './ChildNutritionTrackerView';
+import { getRegionInfo } from '../data/tanzaniaRegions';
 
 interface NutritionistPortalViewProps {
   patients: RegisteredPatient[];
@@ -376,10 +377,15 @@ export const NutritionistPortalView: React.FC<NutritionistPortalViewProps> = ({
                 <button
                   type="button"
                   onClick={() => {
-                    setAdminPasswordInput(securitySettings?.adminPassword || 'admin123');
-                    setIsEditingAdminPassword(true);
+                    if (onOpenChangePassword) {
+                      onOpenChangePassword();
+                    } else {
+                      setAdminPasswordInput(securitySettings?.adminPassword || 'admin123');
+                      setIsEditingAdminPassword(true);
+                    }
                   }}
-                  className="text-xs text-teal-400 hover:text-teal-300 font-bold underline"
+                  className="text-xs text-teal-400 hover:text-teal-300 font-bold underline cursor-pointer"
+                  id="btn-portal-change-admin-password"
                 >
                   Badili Nenosiri
                 </button>
@@ -815,6 +821,76 @@ export const NutritionistPortalView: React.FC<NutritionistPortalViewProps> = ({
                     </div>
                   </div>
                 </div>
+
+                {/* Regional & District Nutrition Dossier Card */}
+                {(() => {
+                  const patRegion = selectedPatient.region || 'Dar es Salaam';
+                  const patDistrict = selectedPatient.district || 'Kinondoni';
+                  const regInfo = getRegionInfo(patRegion);
+                  return (
+                    <div className="bg-gradient-to-r from-teal-50/70 to-emerald-50/50 rounded-2xl p-4 sm:p-5 border border-teal-200 space-y-3">
+                      <div className="flex flex-wrap items-center justify-between gap-2 border-b border-teal-200/70 pb-2.5">
+                        <div className="flex items-center gap-2">
+                          <MapPin className="w-4 h-4 text-teal-700" />
+                          <h4 className="text-xs sm:text-sm font-black text-teal-950">
+                            Mkoa & Wilaya ya Mteja: {patRegion} (Wilaya ya {patDistrict})
+                          </h4>
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() => setIsEditingPatientModalOpen(true)}
+                          className="text-[11px] font-bold text-teal-800 hover:text-teal-950 underline flex items-center gap-1 cursor-pointer"
+                        >
+                          <Edit3 className="w-3 h-3" />
+                          <span>Badili Eneo</span>
+                        </button>
+                      </div>
+
+                      {regInfo && (
+                        <div className="space-y-3 text-xs">
+                          <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5">
+                            <div className="bg-white p-2.5 rounded-xl border border-teal-100 shadow-2xs space-y-1">
+                              <span className="font-bold text-teal-900 flex items-center gap-1 text-[11px]">
+                                🌾 Wanga & Nafaka za {patRegion}:
+                              </span>
+                              <p className="text-[11px] text-slate-600 leading-tight">
+                                {regInfo.commonStaples.join(', ')}
+                              </p>
+                            </div>
+
+                            <div className="bg-white p-2.5 rounded-xl border border-teal-100 shadow-2xs space-y-1">
+                              <span className="font-bold text-emerald-900 flex items-center gap-1 text-[11px]">
+                                🥬 Mboga za Majani za Asili:
+                              </span>
+                              <p className="text-[11px] text-slate-600 leading-tight">
+                                {regInfo.commonVegetables.join(', ')}
+                              </p>
+                            </div>
+
+                            <div className="bg-white p-2.5 rounded-xl border border-teal-100 shadow-2xs space-y-1">
+                              <span className="font-bold text-sky-900 flex items-center gap-1 text-[11px]">
+                                🐟 Vyanzo vya Protini Salama:
+                              </span>
+                              <p className="text-[11px] text-slate-600 leading-tight">
+                                {regInfo.commonProteins.join(', ')}
+                              </p>
+                            </div>
+                          </div>
+
+                          <div className="p-3 bg-teal-800 text-white rounded-xl space-y-1">
+                            <span className="font-bold flex items-center gap-1 text-teal-200 text-[11px]">
+                              <Sparkles className="w-3.5 h-3.5 text-amber-300" />
+                              Ushauri wa Kilishe kwa Mazingira ya {patRegion} & {patDistrict}:
+                            </span>
+                            <p className="text-teal-50 text-[11px] leading-relaxed">
+                              {regInfo.dietaryAdviceSummary}
+                            </p>
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  );
+                })()}
 
                 {/* Patient-Level Security, Password & Print Control Card */}
                 <div className="bg-slate-900 text-white rounded-2xl p-4 sm:p-5 border border-slate-800 space-y-3">

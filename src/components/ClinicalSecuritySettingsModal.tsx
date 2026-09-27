@@ -7,6 +7,8 @@ import {
 } from 'lucide-react';
 import { SecuritySettings, RegisteredPatient, OnlineDoctor } from '../types';
 import { updateAdminPinCloud, updateAdminPasswordCloud } from '../services/dataSyncService';
+import { PasswordComplexityIndicator } from './PasswordComplexityIndicator';
+import { validatePasswordComplexity } from '../utils/passwordValidator';
 
 interface ClinicalSecuritySettingsModalProps {
   isOpen: boolean;
@@ -137,6 +139,11 @@ export const ClinicalSecuritySettingsModal: React.FC<ClinicalSecuritySettingsMod
     };
 
     if (adminPassword.trim() && adminPassword.trim() !== 'admin123') {
+      const comp = validatePasswordComplexity(adminPassword.trim());
+      if (!comp.isValid) {
+        alert(comp.errorMessage || 'Nenosiri la Admin lazima liwe na angalau herufi 8, namba moja (0-9), na herufi kubwa moja (A-Z).');
+        return;
+      }
       try {
         localStorage.setItem('afyalishe_custom_admin_password', adminPassword.trim());
       } catch {}
@@ -386,8 +393,9 @@ export const ClinicalSecuritySettingsModal: React.FC<ClinicalSecuritySettingsMod
                         type="button"
                         onClick={async () => {
                           const clean = adminPassword.trim();
-                          if (!clean || clean.length < 4) {
-                            alert('Nenosiri la Admin lazima liwe na angalau herufi au tarakimu 4.');
+                          const comp = validatePasswordComplexity(clean);
+                          if (!comp.isValid) {
+                            alert(comp.errorMessage || 'Nenosiri lazima liwe na angalau herufi 8, namba moja (0-9), na herufi kubwa moja (A-Z).');
                             return;
                           }
                           try {
@@ -423,6 +431,9 @@ export const ClinicalSecuritySettingsModal: React.FC<ClinicalSecuritySettingsMod
                         {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
                       </button>
                     </div>
+                    {adminPassword.length > 0 && (
+                      <PasswordComplexityIndicator password={adminPassword} className="mt-2" />
+                    )}
                     <span className="text-[10px] text-slate-500 mt-1 block">
                       Badilisha nenosiri hapa; litasasishwa mara moja kwenye wingu (chaguo-msingi: admin123).
                     </span>
@@ -478,22 +489,20 @@ export const ClinicalSecuritySettingsModal: React.FC<ClinicalSecuritySettingsMod
                 </h4>
 
                 {/* Require Login Gate */}
-                <div className="p-3.5 rounded-2xl bg-white border border-slate-200 flex items-center justify-between gap-3 hover:border-slate-300 transition-all">
+                <div className="p-3.5 rounded-2xl bg-teal-50/70 border border-teal-200 flex items-center justify-between gap-3 transition-all">
                   <div className="space-y-0.5">
                     <div className="text-xs font-black text-slate-900 flex items-center gap-1.5">
-                      <Lock className="w-3.5 h-3.5 text-teal-600" />
-                      <span>Lazimisha Kuingia kwa Nenosiri (Mandatory Login Gate)</span>
+                      <Lock className="w-3.5 h-3.5 text-teal-700" />
+                      <span>Ulinzi wa Nenosiri wa Mfumo Mzima (Ulinzi wa Kudumu)</span>
                     </div>
-                    <p className="text-[11px] text-slate-500">
-                      Watumiaji wote (wagonjwa na madaktari) lazima waweke nenosiri kabla ya kuona data yoyote.
+                    <p className="text-[11px] text-teal-900">
+                      Mfumo hautafunguka bila nenosiri na mtu yeyote hawezi kuingia wala kuona taarifa za kliniki bila kuweka nenosiri au PIN.
                     </p>
                   </div>
-                  <input
-                    type="checkbox"
-                    checked={requireLoginFirst}
-                    onChange={(e) => setRequireLoginFirst(e.target.checked)}
-                    className="w-5 h-5 accent-teal-600 cursor-pointer rounded"
-                  />
+                  <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-teal-700 text-white text-[10px] font-bold shrink-0">
+                    <Check className="w-3 h-3 text-teal-200" />
+                    <span>Inalazimishwa Daima</span>
+                  </div>
                 </div>
 
                 {/* Auto Lock Control */}

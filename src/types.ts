@@ -298,6 +298,8 @@ export interface RegisteredPatient {
   age: number;
   gender: 'male' | 'female';
   location: string;
+  region?: string; // Mkoa (e.g. 'Dar es Salaam', 'Dodoma', 'Mwanza')
+  district?: string; // Wilaya (e.g. 'Kinondoni', 'Ilala', 'Dodoma Jiji')
   category: ClientCategory; // 'kisukari' | 'kupunguza_uzito' | 'lishe_jumla'
   registeredDate: string;
   
@@ -382,6 +384,8 @@ export interface UserProfile {
   bloodPressure?: string;
   phone?: string;
   location?: string;
+  region?: string; // Mkoa (e.g. 'Dar es Salaam', 'Dodoma')
+  district?: string; // Wilaya (e.g. 'Kinondoni', 'Dodoma Jiji')
   medicationInfo?: string;
   primaryGoal?: string;
   registeredPatientId?: string;

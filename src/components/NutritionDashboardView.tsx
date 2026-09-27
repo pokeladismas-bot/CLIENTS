@@ -1,13 +1,14 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { 
   Activity, Flame, Scale, ShieldCheck, Plus, Camera, HeartPulse, 
   Calendar, Clock, Trash2, Sparkles, ChevronRight, AlertCircle, 
   CheckCircle2, ArrowUpRight, Megaphone, Pin, ArrowRight, BookOpen, Bell, BellOff, Printer,
-  HardDrive, UploadCloud, Palette
+  HardDrive, UploadCloud, Palette, MapPin, Compass, Utensils, Check, ChevronDown, Edit2
 } from 'lucide-react';
 import { AuthSession, DashboardTheme, GlucoseLog, MealLog, NutritionAnnouncement, UserProfile } from '../types';
 import { WaterIntakeTracker } from './WaterIntakeTracker';
 import { DASHBOARD_THEMES } from '../utils/theme';
+import { TANZANIA_REGIONS, getDistrictsForRegion, getRegionInfo } from '../data/tanzaniaRegions';
 
 const cleanGreetingName = (name: string) => {
   return (name || '')
@@ -30,6 +31,7 @@ interface NutritionDashboardViewProps {
   currentTheme?: DashboardTheme;
   onOpenThemeModal?: () => void;
   authSession?: AuthSession | null;
+  onUpdateProfile?: (updated: UserProfile) => void;
 }
 
 export const NutritionDashboardView: React.FC<NutritionDashboardViewProps> = ({
@@ -46,8 +48,46 @@ export const NutritionDashboardView: React.FC<NutritionDashboardViewProps> = ({
   currentTheme = 'emerald',
   onOpenThemeModal,
   authSession,
+  onUpdateProfile,
 }) => {
   const activeTheme = DASHBOARD_THEMES[currentTheme] || DASHBOARD_THEMES.emerald;
+
+  // Regional Nutrition State
+  const [selectedRegion, setSelectedRegion] = useState<string>(profile.region || 'Dar es Salaam');
+  const [selectedDistrict, setSelectedDistrict] = useState<string>(profile.district || 'Kinondoni');
+  const [isChangingRegion, setIsChangingRegion] = useState<boolean>(false);
+
+  useEffect(() => {
+    if (profile.region) setSelectedRegion(profile.region);
+    if (profile.district) setSelectedDistrict(profile.district);
+  }, [profile.region, profile.district]);
+
+  const handleSelectRegion = (newReg: string) => {
+    setSelectedRegion(newReg);
+    const availableDists = getDistrictsForRegion(newReg);
+    const newDist = availableDists[0] || 'Mjini';
+    setSelectedDistrict(newDist);
+    if (onUpdateProfile) {
+      onUpdateProfile({
+        ...profile,
+        region: newReg,
+        district: newDist,
+        location: `${newDist}, ${newReg}`,
+      });
+    }
+  };
+
+  const handleSelectDistrict = (newDist: string) => {
+    setSelectedDistrict(newDist);
+    if (onUpdateProfile) {
+      onUpdateProfile({
+        ...profile,
+        region: selectedRegion,
+        district: newDist,
+        location: `${newDist}, ${selectedRegion}`,
+      });
+    }
+  };
   // Calculate today's totals
   const today = new Date().toDateString();
   const todayMeals = meals.filter(
@@ -429,6 +469,239 @@ export const NutritionDashboardView: React.FC<NutritionDashboardViewProps> = ({
           </div>
         </div>
       )}
+
+      {/* KIPENGELE CHA KIKANDA: MKOA, WILAYA, VYAKULA VINAVYOPATIKANA NA USHAURI WA KILISHE */}
+      {(() => {
+        const regInfo = getRegionInfo(selectedRegion) || TANZANIA_REGIONS[0];
+        const districtsList = getDistrictsForRegion(selectedRegion);
+
+        return (
+          <div className="bg-gradient-to-br from-white via-teal-50/20 to-emerald-50/30 rounded-3xl p-6 sm:p-7 border border-teal-200/90 shadow-md space-y-5 animate-in fade-in">
+            {/* Header: Title, Current Location Badge & Change Region Button */}
+            <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 border-b border-teal-100 pb-4">
+              <div className="flex items-start sm:items-center gap-3.5">
+                <div className="w-12 h-12 rounded-2xl bg-teal-800 text-teal-200 flex items-center justify-center shrink-0 shadow-md">
+                  <MapPin className="w-6 h-6 text-teal-300" />
+                </div>
+                <div>
+                  <div className="flex flex-wrap items-center gap-2">
+                    <h3 className="text-lg sm:text-xl font-black text-slate-900 tracking-tight">
+                      Vyakula Vinavyopatikana na Ushauri wa Lishe
+                    </h3>
+                    <span className="text-xs font-bold px-2.5 py-0.5 rounded-full bg-teal-800 text-teal-100 uppercase tracking-wider">
+                      Mkoa wa {selectedRegion}
+                    </span>
+                    <span className="text-xs font-bold px-2.5 py-0.5 rounded-full bg-emerald-100 text-emerald-800 border border-emerald-300">
+                      Wilaya ya {selectedDistrict}
+                    </span>
+                  </div>
+                  <p className="text-xs text-slate-600 mt-1">
+                    Kanda ya {regInfo.zone} • Mazao na vyakula vinavyopatikana sokoni na mashambani kwa gharama nafuu.
+                  </p>
+                </div>
+              </div>
+
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => setIsChangingRegion(!isChangingRegion)}
+                  className="px-3.5 py-2 rounded-xl bg-white hover:bg-slate-50 text-teal-800 border border-teal-300 text-xs font-bold shadow-xs transition-all flex items-center gap-1.5 cursor-pointer active:scale-98"
+                >
+                  <Edit2 className="w-3.5 h-3.5 text-teal-600" />
+                  <span>{isChangingRegion ? 'Funga Uchaguzi' : 'Badili Mkoa na Wilaya'}</span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => onSelectTab('recommendations')}
+                  className="px-4 py-2 rounded-xl bg-teal-700 hover:bg-teal-800 text-white text-xs font-extrabold shadow-sm transition-all flex items-center gap-1.5 cursor-pointer active:scale-98"
+                >
+                  <Sparkles className="w-3.5 h-3.5 text-amber-300" />
+                  <span>Menyu Kamili ya {selectedRegion}</span>
+                  <ChevronRight className="w-3.5 h-3.5" />
+                </button>
+              </div>
+            </div>
+
+            {/* Region & District Selector Dropdown Box */}
+            {isChangingRegion && (
+              <div className="p-4 sm:p-5 rounded-2xl bg-white border border-teal-200 shadow-sm space-y-3 animate-in fade-in zoom-in-95">
+                <div className="flex items-center justify-between">
+                  <span className="text-xs font-black text-slate-800 flex items-center gap-1.5">
+                    <Compass className="w-4 h-4 text-teal-600" />
+                    Chagua Mkoa na Wilaya Mgonjwa Anapoishi nchini Tanzania:
+                  </span>
+                  <span className="text-[11px] text-teal-700 font-semibold">
+                    Mikoa 31 ya Tanzania
+                  </span>
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  <div>
+                    <label className="block text-xs font-bold text-slate-700 mb-1">
+                      1. Mkoa (Region):
+                    </label>
+                    <select
+                      value={selectedRegion}
+                      onChange={(e) => handleSelectRegion(e.target.value)}
+                      className="w-full px-3.5 py-2.5 rounded-xl border border-teal-300 bg-teal-50/40 text-slate-900 font-bold text-xs sm:text-sm focus:ring-2 focus:ring-teal-500 focus:outline-none cursor-pointer"
+                    >
+                      {TANZANIA_REGIONS.map((r) => (
+                        <option key={r.name} value={r.name}>
+                          {r.name} ({r.zone})
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-bold text-slate-700 mb-1">
+                      2. Wilaya (District):
+                    </label>
+                    <select
+                      value={selectedDistrict}
+                      onChange={(e) => handleSelectDistrict(e.target.value)}
+                      className="w-full px-3.5 py-2.5 rounded-xl border border-teal-300 bg-teal-50/40 text-slate-900 font-bold text-xs sm:text-sm focus:ring-2 focus:ring-teal-500 focus:outline-none cursor-pointer"
+                    >
+                      {districtsList.map((d) => (
+                        <option key={d} value={d}>
+                          {d}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                </div>
+
+                <div className="flex items-center justify-between pt-1 text-[11px] text-slate-500">
+                  <span>
+                    💡 Mfumo umehifadhi eneo hili: <strong>Wilaya ya {selectedDistrict}, Mkoa wa {selectedRegion}</strong>. Ushauri na vyakula vinavyopatikana hapa chini vimesasishwa papo hapo.
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() => setIsChangingRegion(false)}
+                    className="px-3 py-1 bg-teal-100 hover:bg-teal-200 text-teal-900 rounded-lg font-bold text-xs shrink-0 cursor-pointer"
+                  >
+                    Nimemaliza
+                  </button>
+                </div>
+              </div>
+            )}
+
+            {/* 4 Cards: Staples, Veggies, Proteins, Specialties */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3.5">
+              {/* Card 1: Common Staples */}
+              <div className="p-4 rounded-2xl bg-white border border-slate-200 shadow-xs space-y-2">
+                <div className="flex items-center gap-2">
+                  <div className="w-8 h-8 rounded-xl bg-amber-100 text-amber-800 flex items-center justify-center font-bold text-xs">
+                    🌾
+                  </div>
+                  <div>
+                    <h4 className="text-xs font-extrabold text-slate-900">Nafaka & Wanga Salama</h4>
+                    <span className="text-[10px] text-slate-500">Zinazopatikana {selectedRegion}</span>
+                  </div>
+                </div>
+                <div className="space-y-1 pt-1">
+                  {regInfo.commonStaples.map((staple, i) => (
+                    <div key={i} className="text-xs text-slate-700 flex items-start gap-1.5 leading-tight">
+                      <Check className="w-3.5 h-3.5 text-emerald-600 shrink-0 mt-0.5" />
+                      <span>{staple}</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              {/* Card 2: Common Vegetables */}
+              <div className="p-4 rounded-2xl bg-white border border-slate-200 shadow-xs space-y-2">
+                <div className="flex items-center gap-2">
+                  <div className="w-8 h-8 rounded-xl bg-emerald-100 text-emerald-800 flex items-center justify-center font-bold text-xs">
+                    🥬
+                  </div>
+                  <div>
+                    <h4 className="text-xs font-extrabold text-slate-900">Mboga za Majani Asilia</h4>
+                    <span className="text-[10px] text-slate-500">Nyuzinyuzi tele {selectedRegion}</span>
+                  </div>
+                </div>
+                <div className="space-y-1 pt-1">
+                  {regInfo.commonVegetables.map((veg, i) => (
+                    <div key={i} className="text-xs text-slate-700 flex items-start gap-1.5 leading-tight">
+                      <Check className="w-3.5 h-3.5 text-emerald-600 shrink-0 mt-0.5" />
+                      <span>{veg}</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              {/* Card 3: Common Proteins */}
+              <div className="p-4 rounded-2xl bg-white border border-slate-200 shadow-xs space-y-2">
+                <div className="flex items-center gap-2">
+                  <div className="w-8 h-8 rounded-xl bg-sky-100 text-sky-800 flex items-center justify-center font-bold text-xs">
+                    🐟
+                  </div>
+                  <div>
+                    <h4 className="text-xs font-extrabold text-slate-900">Vyanzo vya Protini</h4>
+                    <span className="text-[10px] text-slate-500">Samaki & Kunde za eneo hili</span>
+                  </div>
+                </div>
+                <div className="space-y-1 pt-1">
+                  {regInfo.commonProteins.map((prot, i) => (
+                    <div key={i} className="text-xs text-slate-700 flex items-start gap-1.5 leading-tight">
+                      <Check className="w-3.5 h-3.5 text-emerald-600 shrink-0 mt-0.5" />
+                      <span>{prot}</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              {/* Card 4: Local Specialties */}
+              <div className="p-4 rounded-2xl bg-white border border-slate-200 shadow-xs space-y-2">
+                <div className="flex items-center gap-2">
+                  <div className="w-8 h-8 rounded-xl bg-rose-100 text-rose-800 flex items-center justify-center font-bold text-xs">
+                    🍲
+                  </div>
+                  <div>
+                    <h4 className="text-xs font-extrabold text-slate-900">Mapishi ya Kiasili Salama</h4>
+                    <span className="text-[10px] text-slate-500">Kiwango cha chini cha sukari</span>
+                  </div>
+                </div>
+                <div className="space-y-1 pt-1">
+                  {regInfo.localSpecialties.map((spec, i) => (
+                    <div key={i} className="text-xs text-slate-700 flex items-start gap-1.5 leading-tight">
+                      <Check className="w-3.5 h-3.5 text-emerald-600 shrink-0 mt-0.5" />
+                      <span>{spec}</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </div>
+
+            {/* Clinical Dietary Advice Box for this region */}
+            <div className="p-4 sm:p-5 rounded-2xl bg-teal-900 text-white border border-teal-800 space-y-2 shadow-inner">
+              <div className="flex items-center gap-2">
+                <Sparkles className="w-4 h-4 text-amber-300" />
+                <h4 className="text-xs sm:text-sm font-extrabold text-white">
+                  Ushauri Maalum wa Kilishe kwa Mazingira ya {selectedRegion} (Wilaya ya {selectedDistrict}):
+                </h4>
+              </div>
+              <p className="text-xs sm:text-sm text-teal-100 leading-relaxed">
+                {regInfo.dietaryAdviceSummary}
+              </p>
+              <div className="pt-2 flex flex-wrap items-center justify-between gap-2 border-t border-teal-800/80 text-[11px] text-teal-200/90">
+                <span>
+                  📍 Makazi Yaliyowekwa: <strong>Wilaya ya {selectedDistrict}, Mkoa wa {selectedRegion}</strong>
+                </span>
+                <button
+                  type="button"
+                  onClick={() => onSelectTab('recommendations')}
+                  className="font-bold text-amber-300 hover:text-white underline flex items-center gap-1 cursor-pointer"
+                >
+                  <span>Angalia ratiba ya mlo wa leo kulingana na sukari yako</span>
+                  <ChevronRight className="w-3 h-3" />
+                </button>
+              </div>
+            </div>
+          </div>
+        );
+      })()}
 
       {/* Today's Meals Timeline */}
       <div className="bg-white rounded-3xl p-6 border border-slate-200 shadow-sm space-y-5">

@@ -1,12 +1,13 @@
 import React, { useState } from 'react';
 import { 
   X, Save, User, Phone, MapPin, Activity, Scale, HeartPulse, 
-  Baby, AlertTriangle, Shield, Check, FileText, Info 
+  Baby, AlertTriangle, Shield, Check, FileText, Info, Compass, Utensils 
 } from 'lucide-react';
 import { 
   RegisteredPatient, ClientCategory, DiabetesType, 
   ChildFeedingChallenge 
 } from '../types';
+import { TANZANIA_REGIONS, getDistrictsForRegion, getRegionInfo } from '../data/tanzaniaRegions';
 
 interface EditPatientModalProps {
   isOpen: boolean;
@@ -25,7 +26,9 @@ export const EditPatientModal: React.FC<EditPatientModalProps> = ({
   const [phone, setPhone] = useState(patient.phone);
   const [age, setAge] = useState<number>(patient.age);
   const [gender, setGender] = useState<'male' | 'female'>(patient.gender);
-  const [location, setLocation] = useState(patient.location || '');
+  const [region, setRegion] = useState<string>(patient.region || 'Dar es Salaam');
+  const [district, setDistrict] = useState<string>(patient.district || 'Kinondoni');
+  const [neighborhood, setNeighborhood] = useState<string>(patient.location || '');
   const [category, setCategory] = useState<ClientCategory>(patient.category || 'kisukari');
   const [diabetesType, setDiabetesType] = useState<DiabetesType>(patient.diabetesType || 'type2');
   
@@ -87,13 +90,21 @@ export const EditPatientModal: React.FC<EditPatientModalProps> = ({
       .map(s => s.trim())
       .filter(Boolean);
 
+    const availableDistricts = getDistrictsForRegion(region);
+    const finalDistrict = district || availableDistricts[0] || 'Mjini';
+    const computedLocation = neighborhood.trim() 
+      ? (neighborhood.includes(finalDistrict) ? neighborhood.trim() : `${neighborhood.trim()}, ${finalDistrict}, ${region}`)
+      : `${finalDistrict}, ${region}`;
+
     const updatedPatient: RegisteredPatient = {
       ...patient,
       fullName: fullName.trim(),
       phone: phone.trim(),
       age: Number(age),
       gender,
-      location: location.trim(),
+      region,
+      district: finalDistrict,
+      location: computedLocation,
       category,
       diabetesType: category === 'kisukari' ? diabetesType : patient.diabetesType,
       initialWeightKg: Number(initialWeightKg),
@@ -249,15 +260,77 @@ export const EditPatientModal: React.FC<EditPatientModalProps> = ({
                 </div>
               </div>
 
-              <div>
-                <label className="block text-xs font-semibold text-slate-700 mb-1">Mahali / Makazi</label>
-                <input
-                  type="text"
-                  value={location}
-                  onChange={e => setLocation(e.target.value)}
-                  placeholder="Mf. Sinza, Dar es Salaam"
-                  className="w-full px-3 py-2 bg-white border border-slate-300 rounded-xl text-sm focus:ring-2 focus:ring-teal-500 focus:outline-hidden"
-                />
+              <div className="sm:col-span-2 grid grid-cols-1 sm:grid-cols-2 gap-3 pt-2 border-t border-slate-200">
+                <div className="space-y-1">
+                  <label className="block text-xs font-semibold text-slate-700 mb-1 flex items-center gap-1.5">
+                    <MapPin className="w-3.5 h-3.5 text-teal-600" />
+                    <span>Mkoa Anaoishi *</span>
+                  </label>
+                  <select
+                    value={region}
+                    onChange={(e) => {
+                      const newReg = e.target.value;
+                      setRegion(newReg);
+                      const dists = getDistrictsForRegion(newReg);
+                      setDistrict(dists[0] || '');
+                    }}
+                    className="w-full px-3 py-2 bg-white border border-slate-300 rounded-xl text-sm focus:ring-2 focus:ring-teal-500 focus:outline-hidden"
+                  >
+                    {TANZANIA_REGIONS.map((r) => (
+                      <option key={r.name} value={r.name}>
+                        {r.name} ({r.zone})
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                <div className="space-y-1">
+                  <label className="block text-xs font-semibold text-slate-700 mb-1 flex items-center gap-1.5">
+                    <Compass className="w-3.5 h-3.5 text-teal-600" />
+                    <span>Wilaya ya Mgonjwa *</span>
+                  </label>
+                  <select
+                    value={district}
+                    onChange={(e) => setDistrict(e.target.value)}
+                    className="w-full px-3 py-2 bg-white border border-slate-300 rounded-xl text-sm focus:ring-2 focus:ring-teal-500 focus:outline-hidden"
+                  >
+                    {getDistrictsForRegion(region).map((dist) => (
+                      <option key={dist} value={dist}>
+                        {dist}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                <div className="sm:col-span-2">
+                  <label className="block text-xs font-semibold text-slate-700 mb-1">Mtaa / Kijiji / Eneo la Makazi</label>
+                  <input
+                    type="text"
+                    value={neighborhood}
+                    onChange={e => setNeighborhood(e.target.value)}
+                    placeholder="Mf. Sinza, Kinondoni, Mbezi, n.k."
+                    className="w-full px-3 py-2 bg-white border border-slate-300 rounded-xl text-sm focus:ring-2 focus:ring-teal-500 focus:outline-hidden"
+                  />
+                </div>
+
+                {/* Regional Food Preview Badge */}
+                {(() => {
+                  const regInfo = getRegionInfo(region);
+                  if (!regInfo) return null;
+                  return (
+                    <div className="sm:col-span-2 p-3 rounded-xl bg-teal-50 border border-teal-200/90 text-xs space-y-1">
+                      <div className="flex items-center gap-1.5 font-bold text-teal-950">
+                        <Utensils className="w-3.5 h-3.5 text-teal-700" />
+                        <span>Vyakula Vikuu vya Mkoa wa {regInfo.name} ({district}):</span>
+                      </div>
+                      <div className="text-[11px] text-teal-900 leading-relaxed">
+                        <strong>Nafaka:</strong> {regInfo.commonStaples.join(', ')} • 
+                        <strong> Mboga:</strong> {regInfo.commonVegetables.join(', ')} • 
+                        <strong> Protini:</strong> {regInfo.commonProteins.join(', ')}
+                      </div>
+                    </div>
+                  );
+                })()}
               </div>
             </div>
 

@@ -270,7 +270,7 @@ export async function performFullSystemSync(payload: SyncPayload): Promise<SyncR
       adminPin: mergedSettings.adminPin,
       adminName: mergedSettings.adminName,
       adminEmail: mergedSettings.adminEmail,
-      requireLoginFirst: mergedSettings.requireLoginFirst ?? false,
+      requireLoginFirst: mergedSettings.requireLoginFirst ?? true,
       allowPatientPrinting: mergedSettings.allowPatientPrinting ?? true,
       sessionTimeoutMinutes: mergedSettings.sessionTimeoutMinutes ?? 0,
       autoLockMinutes: mergedSettings.autoLockMinutes ?? 0,

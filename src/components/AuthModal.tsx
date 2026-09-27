@@ -7,6 +7,8 @@ import {
 } from 'lucide-react';
 import { AuthSession, OnlineDoctor, RegisteredPatient, SecuritySettings, UserRole } from '../types';
 import { signInWithGoogleAuth } from '../services/firebase';
+import { validatePasswordComplexity } from '../utils/passwordValidator';
+import { PasswordComplexityIndicator } from './PasswordComplexityIndicator';
 
 interface AuthModalProps {
   isOpen: boolean;
@@ -72,6 +74,11 @@ export const AuthModal: React.FC<AuthModalProps> = ({
   const [confirmResetPassword, setConfirmResetPassword] = useState<string>('');
   const [showNewResetPass, setShowNewResetPass] = useState<boolean>(false);
   const [resetCompletedMessage, setResetCompletedMessage] = useState<string | null>(null);
+
+  // Real-time password complexity evaluation for AuthModal
+  const resetPassComplexity = validatePasswordComplexity(newResetPassword);
+  const resetPassMatch = confirmResetPassword.length > 0 && newResetPassword === confirmResetPassword;
+  const resetPassMismatch = confirmResetPassword.length > 0 && newResetPassword !== confirmResetPassword;
 
   if (!isOpen) return null;
 
@@ -283,12 +290,16 @@ export const AuthModal: React.FC<AuthModalProps> = ({
     const p2 = confirmResetPassword.trim();
 
     if (!p1) {
-      setResetErrorMessage('Tafadhali ingiza PIN au Nenosiri jipya.');
+      setResetErrorMessage('Tafadhali ingiza Nenosiri jipya.');
       return;
     }
 
-    if (p1.length < 3) {
-      setResetErrorMessage('PIN au Nenosiri lazima liwe na angalau herufi au tarakimu 3.');
+    const complexity = validatePasswordComplexity(p1);
+    if (!complexity.isValid) {
+      setResetErrorMessage(
+        complexity.errorMessage ||
+        'Nenosiri jipya lazima liwe na angalau herufi 8, namba moja (0-9), na herufi kubwa moja (A-Z).'
+      );
       return;
     }
 
@@ -720,17 +731,29 @@ export const AuthModal: React.FC<AuthModalProps> = ({
                         <span>Weka PIN au Nenosiri Jipya Hapa Moja kwa Moja:</span>
                       </h4>
 
-                      <div className="space-y-1">
-                        <label className="text-[11px] font-bold text-slate-700">
-                          Nenosiri / PIN Mpya:
-                        </label>
+                      {/* New Password Input with Real-time Complexity Indicator */}
+                      <div className="space-y-1.5">
+                        <div className="flex items-center justify-between">
+                          <label className="text-[11px] font-bold text-slate-700">
+                            Nenosiri Jipya:
+                          </label>
+                          <span className="text-[10px] text-slate-500 font-medium">
+                            Vigezo 3 vya usalama
+                          </span>
+                        </div>
                         <div className="relative">
                           <input
                             type={showNewResetPass ? 'text' : 'password'}
                             value={newResetPassword}
                             onChange={(e) => setNewResetPassword(e.target.value)}
-                            placeholder="Weka nenosiri au PIN mpya..."
-                            className="w-full px-3 py-2 rounded-xl border border-slate-300 text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-teal-500 bg-white"
+                            placeholder="Weka nenosiri jipya..."
+                            className={`w-full px-3 py-2 pr-10 rounded-xl border text-xs font-semibold focus:outline-none focus:ring-2 bg-white transition-all ${
+                              resetPassComplexity.isValid
+                                ? 'border-emerald-500 focus:border-emerald-600 focus:ring-emerald-500/20'
+                                : newResetPassword.length > 0
+                                ? 'border-amber-400 focus:border-amber-500 focus:ring-amber-500/20'
+                                : 'border-slate-300 focus:border-teal-500 focus:ring-teal-500/20'
+                            }`}
                             required
                           />
                           <button
@@ -741,25 +764,48 @@ export const AuthModal: React.FC<AuthModalProps> = ({
                             {showNewResetPass ? <EyeOff className="w-3.5 h-3.5" /> : <Eye className="w-3.5 h-3.5" />}
                           </button>
                         </div>
+
+                        {/* Real-time Password Complexity Indicator */}
+                        <PasswordComplexityIndicator password={newResetPassword} showAlways={true} />
                       </div>
 
+                      {/* Confirm New Password Input with Match Feedback */}
                       <div className="space-y-1">
-                        <label className="text-[11px] font-bold text-slate-700">
-                          Rudia Nenosiri / PIN Mpya:
-                        </label>
+                        <div className="flex items-center justify-between">
+                          <label className="text-[11px] font-bold text-slate-700">
+                            Rudia Nenosiri Jipya:
+                          </label>
+                          {resetPassMatch && (
+                            <span className="text-[10px] font-bold text-emerald-700 flex items-center gap-1">
+                              <Check className="w-3 h-3" /> Linafanana
+                            </span>
+                          )}
+                          {resetPassMismatch && (
+                            <span className="text-[10px] font-bold text-rose-600 flex items-center gap-1">
+                              <AlertCircle className="w-3 h-3" /> Hayafanani
+                            </span>
+                          )}
+                        </div>
                         <input
                           type={showNewResetPass ? 'text' : 'password'}
                           value={confirmResetPassword}
                           onChange={(e) => setConfirmResetPassword(e.target.value)}
                           placeholder="Rudia tena kwa uhakiki..."
-                          className="w-full px-3 py-2 rounded-xl border border-slate-300 text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-teal-500 bg-white"
+                          className={`w-full px-3 py-2 rounded-xl border text-xs font-semibold focus:outline-none focus:ring-2 bg-white transition-all ${
+                            resetPassMatch
+                              ? 'border-emerald-500 focus:border-emerald-600 focus:ring-emerald-500/20'
+                              : resetPassMismatch
+                              ? 'border-rose-400 focus:border-rose-500 focus:ring-rose-500/20'
+                              : 'border-slate-300 focus:border-teal-500 focus:ring-teal-500/20'
+                          }`}
                           required
                         />
                       </div>
 
                       <button
                         type="submit"
-                        className="w-full py-2.5 rounded-xl bg-teal-600 hover:bg-teal-700 text-white font-bold text-xs shadow-xs transition-all flex items-center justify-center gap-1.5 cursor-pointer"
+                        disabled={!resetPassComplexity.isValid || (confirmResetPassword.length > 0 && newResetPassword !== confirmResetPassword)}
+                        className="w-full py-2.5 rounded-xl bg-teal-600 hover:bg-teal-700 text-white font-bold text-xs shadow-xs transition-all flex items-center justify-center gap-1.5 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
                       >
                         <Check className="w-4 h-4" />
                         <span>Hifadhi Nenosiri Jipya & Ingia Sasa Hivi</span>

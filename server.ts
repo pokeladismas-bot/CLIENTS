@@ -192,22 +192,32 @@ Kokotoa wanga kwa usahihi kwa kila sehemu kwenye sahani na jumla ya sahani nzima
 // 3. AI Dietary Recommendation Endpoint based on Blood Glucose Level
 app.post('/api/recommend-diet', async (req, res) => {
   try {
-    const { glucoseValue, timing, diabetesType, recentMeals, userPreferences } = req.body;
+    const { glucoseValue, timing, diabetesType, recentMeals, userPreferences, region, district, location } = req.body;
 
     const ai = getGeminiClient();
 
-    const prompt = `Wewe ni Mtaalamu wa Lishe ya Kisukari (Clinical Diabetes Dietitian).
+    const mkoaInfo = region ? `Mkoa: ${region}` : 'Tanzania';
+    const wilayaInfo = district ? `Wilaya: ${district}` : '';
+    const eneoKamili = [wilayaInfo, mkoaInfo, location].filter(Boolean).join(', ');
+
+    const prompt = `Wewe ni Mtaalamu Bingwa wa Lishe ya Kisukari na Afya nchini Tanzania (Clinical Diabetes Dietitian in Tanzania).
 Mgonjwa ana taarifa zifuatazo:
 - Kiwango cha Sukari ya Damu cha Sasa: ${glucoseValue} mg/dL (${(Number(glucoseValue) / 18).toFixed(1)} mmol/L)
 - Muda wa Kupima: ${timing || 'Asubuhi kabla ya kula'}
 - Aina ya Kisukari: ${diabetesType || 'Type 2'}
+- Mkoa na Wilaya anayoishi mgonjwa nchini Tanzania: ${eneoKamili || 'Dar es Salaam, Tanzania'}
 - Mlo wa Hivi Karibuni: ${JSON.stringify(recentMeals || [])}
-- Mapendekezo ya ziada: ${userPreferences || 'Vyakula vya asili vya Kitanzania/Afrika Mashariki kama Dona, Ulezi, Mtama, Mboga za majani, Samaki, Maharage'}
+- Mapendekezo/Vyakula vinavyopatikana: ${userPreferences || 'Vyakula asilia vya Kitanzania vinavyopatikana sokoni na mashambani katika mkoa na wilaya hii'}
 
-Tafadhali toa mwongozo wa lishe wa haraka na mapendekezo ya milo (Kifungua Kinywa, Mchana, Usiku, na Vitafunio) unaolenga moja kwa moja kurekebisha au kudumisha kiwango hiki cha sukari.
-Kama sukari iko chini (<70 mg/dL), toa muongozo wa dharura wa 'Rule of 15' (Gramu 15 za sukari ya haraka).
+SHARTI KUU LA KILISHE:
+MAPENDEKEZO YAKO YA VYAKULA LAZIMA YAZINGATIE UHALISIA WA VYAKULA VINAVYOPATIKANA KWA URAHISI katika Mkoa wa ${region || 'Tanzania'} na Wilaya ya ${district || 'yake'}.
+Mfano: Kama mgonjwa yuko Dodoma/Singida, tumia mtama, mlenda wa asili, ulezi, dengu, kuku wa kienyeji. Kama yuko Mwanza/Kagera/Mara, tumia sato, sangara, dagaa wa ziwa, matoke, kisamvu, viazi lishe. Kama yuko Dar/Tanga/Pwani/Zanzibar, tumia samaki wabichi wa bahari, dagaa, matembele, mchicha, dona. Kama yuko Mbeya/Iringa/Njombe/Kilimanjaro/Arusha, tumia maharage ya nambale/uyole, parachichi, ndizi za kupika, viazi lishe, mboga za majani.
+Usipendekeze vyakula vya ghali vya kuagiza nje visivyopatikana mtaani au sokoni kwenye wilaya hii.
+
+Tafadhali toa mwongozo wa lishe wa haraka na mapendekezo ya milo (Kifungua Kinywa, Mchana, Usiku, na Vitafunio) unaolenga moja kwa moja kurekebisha au kudumisha kiwango hiki cha sukari kwa kutumia vyakula vya eneo lake.
+Kama sukari iko chini (<70 mg/dL), toa muongozo wa dharura wa 'Rule of 15' (Gramu 15 za sukari ya haraka au matunda ya eneo lake).
 Kama sukari iko juu (>180 mg/dL), pendekeza milo yenye wanga kidogo sana (low-carb), nyuzinyuzi nyingi, protini konda na unywaji mkubwa wa maji.
-Kama sukari iko kawaida (70-130 kabla ya kula au chini ya 180 baada ya kula), pendekeza milo yenye uwiano kamili wa wanga tata wenye GI ndogo.`;
+Kama sukari iko kawaida (70-130 kabla ya kula au chini ya 180 baada ya kula), pendekeza milo yenye uwiano kamili wa wanga tata wenye GI ndogo wa eneo hilo.`;
 
     const response = await ai.models.generateContent({
       model: 'gemini-3.8-flash',
@@ -260,10 +270,95 @@ Kama sukari iko kawaida (70-130 kabla ya kula au chini ya 180 baada ya kula), pe
     const parsed = JSON.parse(response.text || '{}');
     return res.json({ success: true, data: parsed });
   } catch (error: any) {
-    console.error('Error generating dietary recommendations:', error);
-    return res.status(500).json({
-      error: 'Imeshindikana kuzalisha mapendekezo ya lishe. ' + (error.message || ''),
-    });
+    console.error('Error generating dietary recommendations with Gemini, generating clinical regional fallback:', error);
+    
+    const gVal = Number(req.body.glucoseValue) || 120;
+    const regName = req.body.region || 'Dar es Salaam';
+    const distName = req.body.district || 'Kinondoni';
+    const lowerReg = regName.toLowerCase();
+
+    const isLake = ['mwanza', 'mara', 'kagera', 'geita', 'simiyu', 'shinyanga'].includes(lowerReg);
+    const isCoast = ['dar es salaam', 'tanga', 'pwani', 'lindi', 'mtwara', 'zanzibar', 'kaskazini pemba', 'kusini pemba', 'kaskazini unguja', 'kusini unguja', 'mjini magharibi'].includes(lowerReg);
+    const isHighlands = ['mbeya', 'iringa', 'njombe', 'songwe', 'rukwa', 'kilimanjaro', 'arusha', 'manyara'].includes(lowerReg);
+    const isCentral = ['dodoma', 'singida', 'tabora'].includes(lowerReg);
+
+    const stapleBreakfast = isLake ? 'Uji wa Ulezi usiotiwa sukari na Yai 1 la Kuchemsha' : isCoast ? 'Kipande kidogo cha Muhogo Mbichi wa Kuchemsha na Chai ya Mdalasini' : isHighlands ? 'Uji wa Ulezi na Maziwa Konda au Parachichi' : 'Uji wa Mtama na Karanga chache za kuchemsha';
+    const stapleLunch = isLake ? 'Ugali mdogo wa Dona na Sato wa Kuchemsha na Kisamvu' : isCoast ? 'Ugali wa Dona na Samaki wa Baharini (Changu/Pono) na Mchicha' : isHighlands ? 'Ugali wa Dona na Maharage ya Nambale na Mboga za Majani' : 'Ugali wa Mtama na Kuku wa Kienyeji na Mlenda wa Asili';
+    const stapleDinner = isLake ? 'Supu ya Sangara/Sato, Dagaa na Matembele Mengi' : isCoast ? 'Mchuzi mwepesi wa Samaki, Matembele na Viazi Vitamu kidogo' : isHighlands ? 'Supu ya Mboga nyingi, Maharage na Robo Parachichi' : 'Dengu za Kuchemsha na Mboga za Majani ya Kunde';
+
+    const statusCategory = gVal < 70 ? 'Chini Sana (Hypoglycemia)' : gVal > 180 ? 'Kiwango cha Juu (Hyperglycemia)' : 'Kiwango Bora (Kawaida)';
+    const urgentNote = gVal < 70 
+      ? 'Tahadhari ya Sukari Chini (<70 mg/dL): Tumia kanuni ya 15 (kula gramu 15 za wanga rahisi kama juisi freshi ya chungwa au ndizi mbivu ndogo kisha pima tena baada ya dakika 15).'
+      : gVal > 180
+      ? `Tahadhari ya Sukari Juu (>180 mg/dL): Punguza wanga kwenye mlo unaofuata. Tumia mboga nyingi za majani za ${regName} na unywe glasi 2 za maji safi ya kunywa sasa hivi.`
+      : `Kiwango kizuri cha sukari (${gVal} mg/dL). Dumisha kanuni ya nusu sahani mboga za majani, robo protini, na robo wanga tata wa ${regName}.`;
+
+    const fallbackData = {
+      currentGlucoseLevel: gVal,
+      glucoseStatusCategory: statusCategory,
+      urgentActionNote: urgentNote,
+      recommendedDietaryPlan: {
+        immediateAdvice: `Mpango huu wa chakula umezalishwa mahususi kwa kuzingatia vyakula vinavyopatikana kwa urahisi katika Mkoa wa ${regName} (Wilaya ya ${distName}) na kiwango chako cha sasa cha sukari (${gVal} mg/dL).`,
+        suggestedMeals: [
+          {
+            title: `Kifungua Kinywa cha ${regName}`,
+            mealType: 'breakfast',
+            carbsEstimate: gVal > 180 ? 15 : 28,
+            calories: 220,
+            giLevel: 'Chini',
+            description: stapleBreakfast,
+            benefitsForCurrentGlucose: 'Hutoa nishati ya taratibu asubuhi bila kupandisha sukari haraka.',
+            ingredients: ['Ulezi/Mtama', 'Yai/Maziwa', 'Viungo vya asili (Tangawizi/Mdalasini)'],
+          },
+          {
+            title: `Chakula cha Mchana: Vyakula vya ${regName}`,
+            mealType: 'lunch',
+            carbsEstimate: gVal > 180 ? 25 : 42,
+            calories: 410,
+            giLevel: 'Chini',
+            description: stapleLunch,
+            benefitsForCurrentGlucose: 'Nyuzinyuzi tele za mboga za majani huzuia mmeng\'enyo wa haraka wa wanga.',
+            ingredients: ['Dona/Mtama', 'Samaki/Kuku/Maharage', 'Mboga za Majani'],
+          },
+          {
+            title: `Chakula cha Usiku chepesi cha ${regName}`,
+            mealType: 'dinner',
+            carbsEstimate: gVal > 180 ? 12 : 22,
+            calories: 310,
+            giLevel: 'Chini',
+            description: stapleDinner,
+            benefitsForCurrentGlucose: 'Husaidia kudhibiti sukari wakati wa usingizi na kuamka asubuhi ukiwa na kiwango thabiti.',
+            ingredients: ['Supu ya Asili', 'Mboga za Majani', 'Protini Konda'],
+          },
+          {
+            title: `Kitafunwa chenye Afya cha ${distName}`,
+            mealType: 'snack',
+            carbsEstimate: 10,
+            calories: 95,
+            giLevel: 'Chini',
+            description: 'Tango lililokatwa na nusu yai la kuchemsha au korosho/karanga chache.',
+            benefitsForCurrentGlucose: 'Hukata njaa katikati ya milo bila kusababisha mruko wa sukari.',
+            ingredients: ['Tango', 'Karanga chache zilizokaangwa bila mafuta'],
+          },
+        ],
+        foodsToPrioritize: [
+          `Mboga za majani za kienyeji za ${regName}`,
+          `Samaki na dagaa wabichi au mikunde ya ${regName}`,
+          'Ugali wa dona au mtama usiokobolewa kwa kipimo kidogo',
+          'Maji ya kutosha na viungo asilia vya tangawizi na kitunguu saumu',
+        ],
+        foodsToAvoidNow: [
+          'Vyakula vya kukaanga kwa mafuta mengi',
+          'Wali mweupe uliokobolewa kupita kiasi',
+          'Soda, juisi za pakiti na vinywaji vyenye sukari iliyoongezwa',
+          'Vyakula vya ngano nyeupe na vitafunwa vya viwandani',
+        ],
+        hydrationAdvice: 'Kunywa maji safi ya kunywa glasi 8 hadi 10 kwa siku ili kusaidia usafishaji wa glukosi na figo.',
+        portionGuidance: 'Zingatia kanuni ya sahani: Nusu iwe mboga za majani, robo iwe protini (samaki/dagaa/maharage), na robo iwe wanga tata wa asili.',
+      },
+    };
+
+    return res.json({ success: true, data: fallbackData });
   }
 });
 

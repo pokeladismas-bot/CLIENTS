@@ -18,8 +18,8 @@ export const INITIAL_SECURITY_SETTINGS: SecuritySettings = {
   adminEmail: 'dismaspokela@gmail.com',
   allowPatientPrinting: true, // Ruhusu wagonjwa kuchapisha ripoti
   requireAdminApprovalForExport: false,
-  requireLoginFirst: false, // Mfumo unaruhusiwa kutumika moja kwa moja
-  autoLockMinutes: 0, // Mfumo haujifungi kiotomatiki ili kuruhusu matumizi mepesi
+  requireLoginFirst: true, // Weka mfumo kuto kufunguka bila password na mtu yeyote kushindwa kuingia bila password
+  autoLockMinutes: 10, // Kujifunga kiotomatiki kwa usalama
   autoSyncEnabled: true,
   syncIntervalSeconds: 30,
 };
@@ -40,6 +40,9 @@ export const INITIAL_USER_PROFILE: UserProfile = {
   gender: 'female',
   age: 48,
   waistCm: 86,
+  region: 'Dar es Salaam',
+  district: 'Kinondoni',
+  location: 'Kinondoni, Dar es Salaam',
   medicationInfo: 'Metformin 500mg (Asubuhi & Usiku baada ya chakula)',
   dailyReminders: {
     enabled: true,
@@ -543,6 +546,8 @@ export const INITIAL_REGISTERED_PATIENTS: RegisteredPatient[] = [
     age: 48,
     gender: 'female',
     location: 'Kinondoni, Dar es Salaam',
+    region: 'Dar es Salaam',
+    district: 'Kinondoni',
     category: 'kisukari',
     diabetesType: 'type2',
     registeredDate: '2026-01-15',
@@ -601,6 +606,8 @@ export const INITIAL_REGISTERED_PATIENTS: RegisteredPatient[] = [
     age: 35,
     gender: 'male',
     location: 'Sakina, Arusha',
+    region: 'Arusha',
+    district: 'Arusha Jiji',
     category: 'kupunguza_uzito',
     registeredDate: '2026-01-20',
     initialWeightKg: 98,
@@ -656,6 +663,8 @@ export const INITIAL_REGISTERED_PATIENTS: RegisteredPatient[] = [
     age: 29,
     gender: 'female',
     location: 'Boma, Morogoro',
+    region: 'Morogoro',
+    district: 'Morogoro Mjini',
     category: 'lishe_jumla',
     registeredDate: '2026-02-10',
     initialWeightKg: 63,
@@ -708,6 +717,8 @@ export const INITIAL_REGISTERED_PATIENTS: RegisteredPatient[] = [
     age: 56,
     gender: 'male',
     location: 'Uyole, Mbeya',
+    region: 'Mbeya',
+    district: 'Mbeya Jiji',
     category: 'kisukari',
     diabetesType: 'prediabetes',
     registeredDate: '2026-02-01',
@@ -762,6 +773,8 @@ export const INITIAL_REGISTERED_PATIENTS: RegisteredPatient[] = [
     age: 4,
     gender: 'male',
     location: 'Kijitonyama, Dar es Salaam',
+    region: 'Dar es Salaam',
+    district: 'Kinondoni',
     category: 'watoto_lishe',
     registeredDate: '2026-02-15',
     initialWeightKg: 13.0,
@@ -890,6 +903,8 @@ export const INITIAL_REGISTERED_PATIENTS: RegisteredPatient[] = [
     age: 58,
     gender: 'male',
     location: 'Upanga, Dar es Salaam',
+    region: 'Dar es Salaam',
+    district: 'Ilala',
     category: 'shinikizo_la_damu',
     registeredDate: '2026-02-18',
     initialWeightKg: 84,

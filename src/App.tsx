@@ -69,7 +69,7 @@ import {
   UserRole,
   DashboardTheme
 } from './types';
-import { Bell, HeartPulse, X, ChevronRight, HardDrive, UploadCloud } from 'lucide-react';
+import { Bell, HeartPulse, X, ChevronRight, HardDrive, UploadCloud, Lock, KeyRound, Stethoscope } from 'lucide-react';
 import { playReminderChime } from './utils/reminderSound';
 
 const DEFAULT_SECURITY_SETTINGS: SecuritySettings = {
@@ -79,8 +79,8 @@ const DEFAULT_SECURITY_SETTINGS: SecuritySettings = {
   adminEmail: 'dismaspokela@gmail.com',
   allowPatientPrinting: true,
   requireAdminApprovalForExport: false,
-  requireLoginFirst: false, // Ruhusu mfumo kutumika moja kwa moja bila kizuizi
-  autoLockMinutes: 0,
+  requireLoginFirst: true, // Weka mfumo kuto kufunguka bila password na mtu yeyote kushindwa kuingia bila password
+  autoLockMinutes: 10,
   autoSyncEnabled: true,
   syncIntervalSeconds: 30,
 };
@@ -163,7 +163,7 @@ export default function App() {
           ...DEFAULT_SECURITY_SETTINGS,
           ...parsed,
           adminPassword: (customAdminPass && customAdminPass !== 'admin123') ? customAdminPass : (parsed.adminPassword || DEFAULT_SECURITY_SETTINGS.adminPassword),
-          requireLoginFirst: false, // Ruhusu mfumo kutumika moja kwa moja
+          requireLoginFirst: true, // Weka mfumo kuto kufunguka bila password
         };
       } catch {
         // fallback
@@ -172,6 +172,7 @@ export default function App() {
     return {
       ...DEFAULT_SECURITY_SETTINGS,
       adminPassword: (customAdminPass && customAdminPass !== 'admin123') ? customAdminPass : DEFAULT_SECURITY_SETTINGS.adminPassword,
+      requireLoginFirst: true,
     };
   });
 
@@ -185,16 +186,7 @@ export default function App() {
         // continue
       }
     }
-    // Ruhusu mfumo kutumika mara moja: weka kikao cha Admin DISMAS POKELA
-    const defaultSession: AuthSession = {
-      role: 'admin',
-      username: 'dismaspokela@gmail.com',
-      name: 'DISMAS POKELA',
-      loginTime: new Date().toISOString(),
-      canPrintReports: true,
-    };
-    localStorage.setItem('afyalishe_auth_session', JSON.stringify(defaultSession));
-    return defaultSession;
+    return null;
   });
 
   const [isAuthModalOpen, setIsAuthModalOpen] = useState<boolean>(false);
@@ -456,7 +448,9 @@ export default function App() {
 
   const handleSelectActivePatientForView = (patient: RegisteredPatient) => {
     setSelectedPatientId(patient.id);
-    // Sync patient info to current active profile view
+    // Sync patient info to current active profile view including region and district
+    const pRegion = patient.region || 'Dar es Salaam';
+    const pDistrict = patient.district || 'Kinondoni';
     setProfile((prev) => ({
       ...prev,
       name: patient.fullName,
@@ -466,6 +460,9 @@ export default function App() {
       gender: patient.gender,
       diabetesType: patient.diabetesType || 'type2',
       medicationInfo: patient.currentMedications || prev.medicationInfo,
+      region: pRegion,
+      district: pDistrict,
+      location: patient.location || `${pDistrict}, ${pRegion}`,
     }));
     setPortalMode('patient');
 
@@ -480,6 +477,37 @@ export default function App() {
       setActiveTab('general_nutrition');
     } else {
       setActiveTab('dashboard');
+    }
+  };
+
+  const handleSaveProfile = (updated: UserProfile) => {
+    setProfile(updated);
+    try {
+      localStorage.setItem('afyalishe_user_profile', JSON.stringify(updated));
+    } catch {}
+    // If a patient is selected, sync region, district, and metrics back to RegisteredPatient
+    if (selectedPatientId) {
+      setPatients((prev) =>
+        prev.map((p) => {
+          if (p.id === selectedPatientId) {
+            const up: RegisteredPatient = {
+              ...p,
+              fullName: updated.name || p.fullName,
+              region: updated.region || p.region,
+              district: updated.district || p.district,
+              location: updated.location || p.location || `${updated.district || 'Kinondoni'}, ${updated.region || 'Dar es Salaam'}`,
+              currentWeightKg: updated.weightKg || p.currentWeightKg,
+              heightCm: updated.heightCm || p.heightCm,
+              age: updated.age || p.age,
+              gender: updated.gender || p.gender,
+              diabetesType: updated.diabetesType || p.diabetesType,
+              currentMedications: updated.medicationInfo || p.currentMedications,
+            };
+            return up;
+          }
+          return p;
+        })
+      );
     }
   };
 
@@ -791,8 +819,9 @@ export default function App() {
 
   const activeTheme = DASHBOARD_THEMES[currentTheme] || DASHBOARD_THEMES.emerald;
 
-  // ROLE AUTHENTICATION GATE (Only activated if explicitly enabled in Security Settings)
-  if (securitySettings.requireLoginFirst && !authSession) {
+  // STRICT SYSTEM-WIDE AUTHENTICATION GATE
+  // Mfumo hautafunguka bila nenosiri / PIN ya mtumiaji na hakuna mtu anayeweza kuingia bila nenosiri
+  if (!authSession) {
     return (
       <div className={`min-h-screen ${activeTheme.pageBg} flex flex-col justify-center items-center p-4 sm:p-6 transition-colors duration-200 font-sans selection:bg-emerald-500 selection:text-white`}>
         <AuthGateView
@@ -805,6 +834,7 @@ export default function App() {
           onUpdateDoctorPassword={handleUpdateDoctorPassword}
           onUpdateAdminPassword={handleUpdateAdminPassword}
           lockedNotice={systemLockNotice}
+          onOpenInstallerModal={() => setIsInstallerModalOpen(true)}
         />
       </div>
     );
@@ -876,39 +906,77 @@ export default function App() {
       {/* Main Content Area */}
       <main className="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-6 sm:py-8">
         
-        {/* Face 1: Dawati la Mtaalam wa Lishe */}
+        {/* Face 1: Dawati la Mtaalam wa Lishe & Sehemu ya Admin */}
         {activeTab === 'nutritionist' && (
-          <NutritionistPortalView
-            patients={patients}
-            onOpenRegisterModal={(category) => {
-              setRegisterInitialCategory(category || 'kisukari');
-              setIsRegisterModalOpen(true);
-            }}
-            onUpdatePatient={handleUpdatePatient}
-            onDeletePatient={handleDeletePatient}
-            onSelectActivePatientForView={handleSelectActivePatientForView}
-            securitySettings={securitySettings}
-            onUpdateSecuritySettings={setSecuritySettings}
-            glucoseLogs={glucoseLogs}
-            mealLogs={meals}
-            onOpenAdminPractitionersModal={() => setIsAdminPractitionersModalOpen(true)}
-            onOpenInstallerModal={() => setIsInstallerModalOpen(true)}
-            onOpenSecuritySettings={() => setIsSecuritySettingsModalOpen(true)}
-            onOpenChangePassword={() => setIsChangePasswordModalOpen(true)}
-            onOpenAdminBackupModal={() => setIsDriveModalOpen(true)}
-            onOpenPrintReport={(glucoseVal) => {
-              const fakeLog: GlucoseLog = {
-                id: 'report-' + Date.now(),
-                timestamp: new Date().toISOString(),
-                value: glucoseVal || 120,
-                unit: profile.unit,
-                timing: 'fasting',
-                status: 'kawaida',
-                notes: `Ripoti ya kliniki: ${selectedPatient?.fullName || profile.name}`,
-              };
-              setPrintReportLog(fakeLog);
-            }}
-          />
+          (authSession?.role === 'admin' || authSession?.role === 'practitioner') ? (
+            <NutritionistPortalView
+              patients={patients}
+              onOpenRegisterModal={(category) => {
+                setRegisterInitialCategory(category || 'kisukari');
+                setIsRegisterModalOpen(true);
+              }}
+              onUpdatePatient={handleUpdatePatient}
+              onDeletePatient={handleDeletePatient}
+              onSelectActivePatientForView={handleSelectActivePatientForView}
+              securitySettings={securitySettings}
+              onUpdateSecuritySettings={setSecuritySettings}
+              glucoseLogs={glucoseLogs}
+              mealLogs={meals}
+              onOpenAdminPractitionersModal={() => setIsAdminPractitionersModalOpen(true)}
+              onOpenInstallerModal={() => setIsInstallerModalOpen(true)}
+              onOpenSecuritySettings={() => setIsSecuritySettingsModalOpen(true)}
+              onOpenChangePassword={() => setIsChangePasswordModalOpen(true)}
+              onOpenAdminBackupModal={() => setIsDriveModalOpen(true)}
+              onOpenPrintReport={(glucoseVal) => {
+                const fakeLog: GlucoseLog = {
+                  id: 'report-' + Date.now(),
+                  timestamp: new Date().toISOString(),
+                  value: glucoseVal || 120,
+                  unit: profile.unit,
+                  timing: 'fasting',
+                  status: 'kawaida',
+                  notes: `Ripoti ya kliniki: ${selectedPatient?.fullName || profile.name}`,
+                };
+                setPrintReportLog(fakeLog);
+              }}
+            />
+          ) : (
+            <div className="max-w-xl mx-auto my-12 bg-white rounded-3xl p-6 sm:p-8 shadow-xl border border-slate-200 text-center space-y-5 animate-in fade-in">
+              <div className="w-16 h-16 rounded-3xl bg-teal-50 border border-teal-200 text-teal-600 flex items-center justify-center mx-auto shadow-inner">
+                <Lock className="w-8 h-8 text-teal-600" />
+              </div>
+              <div className="space-y-2">
+                <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-teal-50 text-teal-800 text-xs font-black uppercase tracking-wider border border-teal-200">
+                  <span>Dawati la Msimamizi Mkuu & Mtaalamu wa Lishe</span>
+                </div>
+                <h3 className="text-xl sm:text-2xl font-black text-slate-900">
+                  Ingia Kwenye Mfumo Kwanza
+                </h3>
+                <p className="text-sm text-slate-600 max-w-md mx-auto leading-relaxed">
+                  Mipangilio ya mfumo, usimamizi wa kliniki, na faili za wagonjwa zinaonekana baada ya kuingia kwenye mfumo tu kama Admin au Mtaalamu wa Lishe.
+                </p>
+              </div>
+
+              <div className="pt-2 flex flex-col sm:flex-row gap-3 justify-center">
+                <button
+                  type="button"
+                  onClick={() => handleOpenAuthModal('admin')}
+                  className="px-6 py-3 rounded-2xl bg-teal-600 hover:bg-teal-500 text-white font-black text-sm shadow-md transition-all flex items-center justify-center gap-2 cursor-pointer active:scale-98"
+                >
+                  <KeyRound className="w-4 h-4" />
+                  <span>Ingia Kama Admin</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => handleOpenAuthModal('practitioner')}
+                  className="px-6 py-3 rounded-2xl bg-slate-100 hover:bg-slate-200 text-slate-800 font-bold text-sm border border-slate-200 transition-all flex items-center justify-center gap-2 cursor-pointer"
+                >
+                  <Stethoscope className="w-4 h-4 text-teal-600" />
+                  <span>Ingia Kama Mtaalamu</span>
+                </button>
+              </div>
+            </div>
+          )
         )}
 
         {/* Kliniki ya Kupunguza Uzito (Weight Loss Clinic) */}
@@ -953,6 +1021,7 @@ export default function App() {
             currentTheme={currentTheme}
             onOpenThemeModal={() => setIsThemeModalOpen(true)}
             authSession={authSession}
+            onUpdateProfile={handleSaveProfile}
           />
         )}
 
@@ -1094,12 +1163,16 @@ export default function App() {
         isOpen={isProfileModalOpen}
         onClose={() => setIsProfileModalOpen(false)}
         profile={profile}
-        onSaveProfile={setProfile}
+        onSaveProfile={handleSaveProfile}
         authSession={authSession}
         securitySettings={securitySettings}
         onOpenSecuritySettings={() => {
           setIsProfileModalOpen(false);
           setIsSecuritySettingsModalOpen(true);
+        }}
+        onOpenChangePasswordModal={() => {
+          setIsProfileModalOpen(false);
+          setIsChangePasswordModalOpen(true);
         }}
       />
 

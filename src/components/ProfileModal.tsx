@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
-import { User, X, CheckCircle2, ShieldCheck, HeartPulse, Scale, Bell, Clock, Volume2, Settings, Sliders, Lock, KeyRound } from 'lucide-react';
+import { User, X, CheckCircle2, ShieldCheck, HeartPulse, Scale, Bell, Clock, Volume2, Settings, Sliders, Lock, KeyRound, MapPin, Compass, Utensils } from 'lucide-react';
 import { AuthSession, DailyReminderConfig, DiabetesType, GlucoseUnit, SecuritySettings, UserProfile } from '../types';
+import { TANZANIA_REGIONS, getDistrictsForRegion, getRegionInfo } from '../data/tanzaniaRegions';
 
 interface ProfileModalProps {
   isOpen: boolean;
@@ -10,6 +11,7 @@ interface ProfileModalProps {
   authSession?: AuthSession | null;
   securitySettings?: SecuritySettings;
   onOpenSecuritySettings?: () => void;
+  onOpenChangePasswordModal?: () => void;
 }
 
 export const ProfileModal: React.FC<ProfileModalProps> = ({
@@ -20,10 +22,13 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({
   authSession = null,
   securitySettings,
   onOpenSecuritySettings,
+  onOpenChangePasswordModal,
 }) => {
   const [name, setName] = useState<string>(profile.name);
   const [diabetesType, setDiabetesType] = useState<DiabetesType>(profile.diabetesType);
   const [unit, setUnit] = useState<GlucoseUnit>(profile.unit);
+  const [region, setRegion] = useState<string>(profile.region || 'Dar es Salaam');
+  const [district, setDistrict] = useState<string>(profile.district || 'Kinondoni');
   const [weightKg, setWeightKg] = useState<number>(profile.weightKg || 78);
   const [heightCm, setHeightCm] = useState<number>(profile.heightCm || 170);
   const [gender, setGender] = useState<'male' | 'female'>(profile.gender || 'male');
@@ -56,11 +61,15 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
+    const finalDistrict = district || getDistrictsForRegion(region)[0] || 'Mjini';
     onSaveProfile({
       ...profile,
       name,
       diabetesType,
       unit,
+      region,
+      district: finalDistrict,
+      location: `${finalDistrict}, ${region}`,
       weightKg: Number(weightKg),
       heightCm: Number(heightCm),
       gender,
@@ -149,6 +158,72 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({
                 <option value="mmol/L">mmol/L</option>
               </select>
             </div>
+          </div>
+
+          {/* Mkoa na Wilaya ya Mgonjwa kwa Ajili ya Ushauri wa Vyakula */}
+          <div className="p-3.5 bg-slate-50 rounded-2xl border border-slate-200 space-y-3">
+            <div className="flex items-center justify-between">
+              <span className="text-xs font-bold text-slate-800 flex items-center gap-1.5">
+                <MapPin className="w-3.5 h-3.5 text-teal-600" />
+                <span>Eneo la Makazi (Mkoa na Wilaya ya Tanzania)</span>
+              </span>
+              <span className="text-[10px] text-teal-800 font-bold bg-teal-100 px-2 py-0.5 rounded-full">
+                Ushauri wa Vyakula vya Eneo Hili
+              </span>
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+              <div>
+                <label className="block text-[11px] font-bold text-slate-600 mb-1">Mkoa:</label>
+                <select
+                  value={region}
+                  onChange={(e) => {
+                    const newReg = e.target.value;
+                    setRegion(newReg);
+                    const dists = getDistrictsForRegion(newReg);
+                    setDistrict(dists[0] || '');
+                  }}
+                  className="w-full px-3 py-2 bg-white border border-slate-200 rounded-xl text-xs font-medium focus:ring-2 focus:ring-emerald-500 cursor-pointer"
+                >
+                  {TANZANIA_REGIONS.map((r) => (
+                    <option key={r.name} value={r.name}>
+                      {r.name} ({r.zone})
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              <div>
+                <label className="block text-[11px] font-bold text-slate-600 mb-1">Wilaya:</label>
+                <select
+                  value={district}
+                  onChange={(e) => setDistrict(e.target.value)}
+                  className="w-full px-3 py-2 bg-white border border-slate-200 rounded-xl text-xs font-medium focus:ring-2 focus:ring-emerald-500 cursor-pointer"
+                >
+                  {getDistrictsForRegion(region).map((dist) => (
+                    <option key={dist} value={dist}>
+                      {dist}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            </div>
+
+            {(() => {
+              const regInfo = getRegionInfo(region);
+              if (!regInfo) return null;
+              return (
+                <div className="p-2.5 rounded-xl bg-teal-50/70 border border-teal-200/80 text-[11px] text-teal-900 space-y-1">
+                  <div className="font-bold flex items-center gap-1">
+                    <Utensils className="w-3.5 h-3.5 text-teal-700" />
+                    <span>Vyakula vya asili vya {regInfo.name} ({district}):</span>
+                  </div>
+                  <p className="text-[10px] text-teal-800 leading-tight">
+                    {regInfo.commonStaples.slice(0, 3).join(', ')} • {regInfo.commonVegetables.slice(0, 3).join(', ')} • {regInfo.commonProteins.slice(0, 2).join(', ')}
+                  </p>
+                </div>
+              );
+            })()}
           </div>
 
           {/* Body Measurements & BMI */}
@@ -414,6 +489,21 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({
                 </div>
               </div>
 
+              {/* Badilisha Nenosiri Lako baada ya kuingia kwenye mfumo */}
+              {onOpenChangePasswordModal && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    onClose();
+                    onOpenChangePasswordModal();
+                  }}
+                  className="w-full py-2.5 px-3 rounded-xl bg-amber-600 hover:bg-amber-700 active:scale-[0.99] text-white text-xs font-black transition-all flex items-center justify-center gap-2 cursor-pointer shadow-xs"
+                >
+                  <KeyRound className="w-4 h-4 text-amber-200" />
+                  <span>🔑 Badilisha Nenosiri Lako la Kuingia</span>
+                </button>
+              )}
+
               {onOpenSecuritySettings && (
                 <button
                   type="button"
@@ -427,6 +517,23 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({
                   <span>Fungua Mipangilio Kamili ya Usalama & Mfumo</span>
                 </button>
               )}
+            </div>
+          )}
+
+          {/* Badilisha Nenosiri kwa mtumiaji wa kawaida aliyeingia kwenye mfumo */}
+          {authSession && authSession.role !== 'admin' && onOpenChangePasswordModal && (
+            <div className="pt-1">
+              <button
+                type="button"
+                onClick={() => {
+                  onClose();
+                  onOpenChangePasswordModal();
+                }}
+                className="w-full py-2.5 px-3 rounded-xl bg-amber-50 hover:bg-amber-100 border border-amber-200 text-amber-900 text-xs font-black transition-all flex items-center justify-center gap-2 cursor-pointer shadow-2xs"
+              >
+                <KeyRound className="w-4 h-4 text-amber-600" />
+                <span>🔑 Badilisha Nenosiri / PIN Yako</span>
+              </button>
             </div>
           )}
 
